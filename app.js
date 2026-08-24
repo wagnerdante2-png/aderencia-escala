@@ -13,7 +13,8 @@ const MONTHS = {
   janeiro:0, fevereiro:1, marco:2, março:2, abril:3, maio:4, junho:5,
   julho:6, agosto:7, setembro:8, outubro:9, novembro:10, dezembro:11
 };
-const NON_WORK_CODES = new Set(['F','FER','AF','AB','AL','FF','FC','NC']);
+const NON_WORK_CODES = new Set(['F','FER','AF','AB','AL','FF','FC','NC','AE']);
+const DAY_CODE_RE = /^(?:T\d{1,2}|F|FER|AF|AB|AL|FF|FC|NC|AE)$/i;
 
 function norm(s='') {
   return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
@@ -26,7 +27,6 @@ function isoDate(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d)
 function minutes(t){ const [h,m]=t.split(':').map(Number); return h*60+m; }
 function timeDiff(a,b){ const d=Math.abs(minutes(a)-minutes(b)); return Math.min(d,1440-d); }
 function fmtPct(v){ return `${(v*100).toFixed(2).replace('.',',')}%`; }
-function escapeRegExp(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
 
 function levenshtein(a,b){
   const m=a.length,n=b.length, dp=Array.from({length:m+1},(_,i)=>[i]);
@@ -50,7 +50,7 @@ async function pdfPages(file){
       if(!row){ row={y:item.y,items:[]}; rows.push(row); }
       row.items.push(item);
     }
-    rows.forEach(r=>{r.items.sort((a,b)=>a.x-b.x);r.text=r.items.map(i=>i.text).join(' ');});
+    rows.forEach(r=>{ r.items.sort((a,b)=>a.x-b.x); r.text=r.items.map(i=>i.text).join(' '); });
     rows.sort((a,b)=>b.y-a.y);
     pages.push({page:p,items,rows,text:rows.map(r=>r.text).join('\n')});
   }
@@ -72,7 +72,8 @@ function parsePointRows(pages){
         if(name){
           const key=norm(name);
           current={name:name.trim(),key,registration:(mat||'').trim(),store:null,days:new Map()};
-          result.employees.set(key,current); daily=true;
+          result.employees.set(key,current);
+          daily=true;
         }
         continue;
       }
@@ -96,9 +97,12 @@ function parsePointRows(pages){
 }
 
 function inferMonthYear(text){
-  const lower=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const plain=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   let month=null;
-  for(const [name,idx] of Object.entries(MONTHS)) if(lower.includes(norm(name).toLowerCase())) { month=idx; break; }
+  for(const [name,idx] of Object.entries(MONTHS)){
+    const key=name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    if(plain.includes(key)){ month=idx; break; }
+  }
   const years=[...text.matchAll(/\b(20\d{2})\b/g)].map(m=>Number(m[1]));
   return {month,year:years[0]||null};
 }
@@ -107,12 +111,13 @@ function buildDates(dayNumbers, month, year){
   let m=month,y=year,prev=dayNumbers[0];
   return dayNumbers.map((d,i)=>{
     if(i>0 && d<prev){ m++; if(m>11){m=0;y++;} }
-    prev=d; return isoDate(y,m,d);
+    prev=d;
+    return isoDate(y,m,d);
   });
 }
 function parseTurnLegend(text){
   const turns=new Map();
-  const re=/\b(T\d{1,2})\s*(?:\||-|:)?[^\n]{0,24}?([0-2]\d:[0-5]\d)\s*(?:a|à|as|às|-)[^\n]{0,8}?([0-2]\d:[0-5]\d)/gi;
+  const re=/\b(T\d{1,2})\s*(?:\||-|:)?[^\n]{0,30}?([0-2]\d:[0-5]\d)\s*(?:a|à|as|às|-)[^\n]{0,10}?([0-2]\d:[0-5]\d)/gi;
   for(const m of text.matchAll(re)) turns.set(norm(m[1]),{start:m[2],end:m[3]});
   return turns;
 }
@@ -128,18 +133,26 @@ function parseSchedulePdfPages(pages){
     const nomeItem=page.items.find(i=>norm(i.text)==='NOME');
     const cargoItem=page.items.find(i=>norm(i.text)==='CARGO');
     if(!nomeItem || !cargoItem) continue;
-    const headerY=nomeItem.y;
-    const dayItems=page.items.filter(i=>Math.abs(i.y-headerY)<3 && /^\d{1,2}$/.test(i.text) && Number(i.text)>=1 && Number(i.text)<=31 && i.x>cargoItem.x+25).sort((a,b)=>a.x-b.x);
-    if(dayItems.length<20) continue;
+
+    const candidateRows=page.rows.map(r=>({
+      row:r,
+      days:r.items.filter(i=>/^\d{1,2}$/.test(i.text) && Number(i.text)>=1 && Number(i.text)<=31 && i.x>cargoItem.x+20).sort((a,b)=>a.x-b.x)
+    })).filter(x=>x.days.length>=20);
+    if(!candidateRows.length) continue;
+    candidateRows.sort((a,b)=>b.days.length-a.days.length);
+    const dayItems=candidateRows[0].days;
+    const dayHeaderY=candidateRows[0].row.y;
     const dayNumbers=dayItems.map(i=>Number(i.text));
     const dates=buildDates(dayNumbers,month,year);
+    if(!dates.length) throw new Error('Mês/ano da escala PDF não puderam ser identificados.');
     const firstDayX=dayItems[0].x;
     const lastDayX=dayItems[dayItems.length-1].x;
+    const dataTopY=Math.min(nomeItem.y,dayHeaderY)-2;
 
     for(const row of page.rows){
-      if(row.y>=headerY-3) continue;
+      if(row.y>=dataTopY) continue;
       const cells=row.items;
-      const codes=cells.filter(i=>i.x>=firstDayX-8 && i.x<=lastDayX+20 && /^(?:T\d{1,2}|F|FER|AF|AB|AL|FF|FC|NC)$/i.test(i.text));
+      const codes=cells.filter(i=>i.x>=firstDayX-8 && i.x<=lastDayX+20 && DAY_CODE_RE.test(i.text));
       if(codes.length<5) continue;
       const name=cells.filter(i=>i.x<cargoItem.x-4).map(i=>i.text).join(' ').trim();
       if(!name || norm(name)==='NOME') continue;
@@ -148,7 +161,7 @@ function parseSchedulePdfPages(pages){
       for(const codeItem of codes){
         let idx=0,best=Infinity;
         dayItems.forEach((d,i)=>{ const dist=Math.abs(d.x-codeItem.x); if(dist<best){best=dist;idx=i;} });
-        if(best<16 && dates[idx]){
+        if(best<18 && dates[idx]){
           const code=norm(codeItem.text);
           const turn=result.turns.get(code);
           emp.days.set(dates[idx],{date:dates[idx],code,start:turn?.start||null});
@@ -159,7 +172,8 @@ function parseSchedulePdfPages(pages){
   }
   if(!result.employees.size) throw new Error('Não consegui localizar a matriz Nome × Dias no PDF da escala.');
   const allDates=[...result.employees.values()].flatMap(e=>[...e.days.keys()]).sort();
-  result.periodStart=allDates[0]||null; result.periodEnd=allDates.at(-1)||null;
+  result.periodStart=allDates[0]||null;
+  result.periodEnd=allDates.at(-1)||null;
   return result;
 }
 
@@ -170,25 +184,31 @@ function cellText(v){
 }
 function excelSerialToDate(v){
   if(typeof v!=='number' || v<30000) return null;
-  const o=XLSX.SSF.parse_date_code(v); return o?isoDate(o.y,o.m-1,o.d):null;
+  const o=XLSX.SSF.parse_date_code(v);
+  return o?isoDate(o.y,o.m-1,o.d):null;
 }
+
 function parseScheduleWorkbook(buffer){
   if(!window.XLSX) throw new Error('Biblioteca de Excel não carregada. Verifique sua conexão com a internet.');
   const wb=XLSX.read(buffer,{type:'array',cellDates:true,cellFormula:true});
   let best=null;
+
   for(const name of wb.SheetNames){
     const ws=wb.Sheets[name];
     const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
     let score=0;
-    for(const r of rows.slice(0,80)){
+    for(const r of rows.slice(0,100)){
       const n=r.map(cellText).map(norm);
-      if(n.includes('NOME')) score+=5;
-      if(n.includes('CARGO')) score+=3;
-      score+=n.filter(v=>/^T\d+$/.test(v)).length*.05;
+      if(n.includes('NOME')) score+=7;
+      if(n.includes('CARGO')) score+=5;
+      score+=n.filter(v=>/^T\d+$/.test(v)).length*.08;
+      score+=n.filter(v=>/^T\d+ \d{2}:\d{2}/.test(v.replace('|',''))).length*.5;
     }
+    if(norm(name)==='ESCALA MENSAL') score+=20;
     if(!best || score>best.score) best={name,rows,score};
   }
-  if(!best || best.score<5) throw new Error('Não encontrei uma aba com a estrutura da Escala Operacional.');
+
+  if(!best || best.score<8) throw new Error('Não encontrei uma aba com a estrutura da Escala Operacional.');
   const rows=best.rows;
   const text=rows.map(r=>r.map(cellText).join(' | ')).join('\n');
   const result={type:'schedule',source:'excel',sheet:best.name,store:null,periodStart:null,periodEnd:null,employees:new Map(),turns:parseTurnLegend(text),warnings:[]};
@@ -196,19 +216,21 @@ function parseScheduleWorkbook(buffer){
   if(store) result.store=`ML${String(Number(store)).padStart(2,'0')}`;
   const {month,year}=inferMonthYear(text);
 
-  let h=-1,nameCol=-1,cargoCol=-1;
-  for(let i=0;i<Math.min(rows.length,100);i++){
+  let nameRow=-1,nameCol=-1,cargoRow=-1,cargoCol=-1;
+  for(let i=0;i<Math.min(rows.length,120);i++){
     const n=rows[i].map(cellText).map(norm);
-    const ni=n.indexOf('NOME'), ci=n.indexOf('CARGO');
-    if(ni>=0 && ci>=0){h=i;nameCol=ni;cargoCol=ci;break;}
+    const ni=n.indexOf('NOME');
+    const ci=n.indexOf('CARGO');
+    if(ni>=0 && nameRow<0){ nameRow=i; nameCol=ni; }
+    if(ci>=0 && cargoRow<0){ cargoRow=i; cargoCol=ci; }
   }
-  if(h<0) throw new Error('Cabeçalho Nome/Cargo não encontrado na escala Excel.');
+  if(nameRow<0 || cargoRow<0) throw new Error('Cabeçalhos Nome/Cargo não encontrados na escala Excel.');
 
-  const header=rows[h];
+  const dateHeaderRow = rows[cargoRow] || rows[nameRow];
   const dateCols=[];
-  let inferredDays=[];
-  for(let c=cargoCol+1;c<header.length;c++){
-    const v=header[c];
+  const inferredDays=[];
+  for(let c=cargoCol+1;c<dateHeaderRow.length;c++){
+    const v=dateHeaderRow[c];
     let date=null;
     if(v instanceof Date) date=isoDate(v.getFullYear(),v.getMonth(),v.getDate());
     else date=excelSerialToDate(v);
@@ -222,18 +244,25 @@ function parseScheduleWorkbook(buffer){
   }
   if(dateCols.length<20) throw new Error('Não consegui identificar as datas da escala Excel.');
 
-  for(let r=h+1;r<rows.length;r++){
+  const firstEmployeeRow=Math.max(nameRow,cargoRow)+1;
+  for(let r=firstEmployeeRow;r<rows.length;r++){
     const name=cellText(rows[r][nameCol]);
-    if(!name || /^(TOTAL|LEGENDA|GERENCIAL)$/i.test(name)) continue;
-    const codes=dateCols.map(d=>({date:d.date,code:norm(cellText(rows[r][d.c]))})).filter(x=>/^(?:T\d{1,2}|F|FER|AF|AB|AL|FF|FC|NC)$/.test(x.code));
+    if(!name || /^(TOTAL|LEGENDA|GERENCIAL|MOTOR|CONSOLIDADO)$/i.test(name)) continue;
+    const codes=dateCols.map(d=>({date:d.date,code:norm(cellText(rows[r][d.c]))})).filter(x=>DAY_CODE_RE.test(x.code));
     if(codes.length<5) continue;
-    const key=norm(name); const emp={name:name.trim(),key,days:new Map()};
-    for(const x of codes){ const turn=result.turns.get(x.code); emp.days.set(x.date,{date:x.date,code:x.code,start:turn?.start||null}); }
+    const key=norm(name);
+    const emp={name:name.trim(),key,days:new Map()};
+    for(const x of codes){
+      const turn=result.turns.get(x.code);
+      emp.days.set(x.date,{date:x.date,code:x.code,start:turn?.start||null});
+    }
     result.employees.set(key,emp);
   }
+
   if(!result.employees.size) throw new Error('Nenhuma linha de colaborador foi reconhecida na escala Excel.');
   const allDates=[...result.employees.values()].flatMap(e=>[...e.days.keys()]).sort();
-  result.periodStart=allDates[0]||null; result.periodEnd=allDates.at(-1)||null;
+  result.periodStart=allDates[0]||null;
+  result.periodEnd=allDates.at(-1)||null;
   return result;
 }
 
@@ -250,65 +279,103 @@ function findPointEmployee(scheduleEmp, points, used){
 
 function calculate(point,schedule){
   const warnings=[];
-  if(point.store && schedule.store && point.store!==schedule.store) throw new Error(`Arquivos de lojas diferentes: ponto ${point.store} e escala ${schedule.store}.`);
-  const start=[point.periodStart,schedule.periodStart].filter(Boolean).sort().at(-1);
-  const end=[point.periodEnd,schedule.periodEnd].filter(Boolean).sort()[0];
+  if(point.store && schedule.store && point.store!==schedule.store){
+    throw new Error(`Arquivos de lojas diferentes: ponto ${point.store} e escala ${schedule.store}.`);
+  }
+
+  const starts=[point.periodStart,schedule.periodStart].filter(Boolean).sort();
+  const ends=[point.periodEnd,schedule.periodEnd].filter(Boolean).sort();
+  const start=starts.at(-1)||null;
+  const end=ends[0]||null;
   if(start && end && start>end) throw new Error('Os períodos do ponto e da escala não possuem datas em comum.');
-  if(point.periodStart!==schedule.periodStart || point.periodEnd!==schedule.periodEnd) warnings.push(`Períodos não são idênticos; foi considerada apenas a interseção ${start||'?'} a ${end||'?'}.`);
+  if(point.periodStart!==schedule.periodStart || point.periodEnd!==schedule.periodEnd){
+    warnings.push(`Períodos não são idênticos; foi considerada apenas a interseção ${start||'?'} a ${end||'?'}.`);
+  }
 
   let deviations=0,nc=0,totalMarks=0,matched=0;
-  const used=new Set(); const unmatched=[]; const fuzzy=[];
+  const used=new Set();
+  const unmatched=[];
+  const fuzzy=[];
+  const missingTurns=new Set();
+
   for(const sEmp of schedule.employees.values()){
     const hit=findPointEmployee(sEmp,point.employees,used);
     if(!hit){ unmatched.push(sEmp.name); continue; }
-    used.add(hit.key); matched++;
+    used.add(hit.key);
+    matched++;
     if(hit.confidence<1) fuzzy.push(`${sEmp.name} ↔ ${hit.emp.name}`);
 
     for(const [date,sDay] of sEmp.days){
-      if(start && date<start || end && date>end) continue;
+      if((start && date<start) || (end && date>end)) continue;
       const pDay=hit.emp.days.get(date);
       if(!pDay) continue;
       totalMarks += pDay.marks.length;
       if(!pDay.firstEntry) continue;
-      if(NON_WORK_CODES.has(sDay.code)) { nc++; continue; }
+
+      if(NON_WORK_CODES.has(sDay.code)){
+        nc++;
+        continue;
+      }
       if(/^T\d+$/i.test(sDay.code)){
-        if(!sDay.start){ warnings.push(`Turno ${sDay.code} sem horário na legenda; alguns dias não puderam ser comparados.`); continue; }
+        if(!sDay.start){ missingTurns.add(sDay.code); continue; }
         if(timeDiff(sDay.start,pDay.firstEntry)>90) deviations++;
       }
     }
   }
+
   if(!matched) throw new Error('Nenhum colaborador da escala foi conciliado com o espelho de ponto.');
   if(!totalMarks) throw new Error('Não encontrei marcações de ponto utilizáveis no período conciliado.');
   if(unmatched.length) warnings.push(`${unmatched.length} colaborador(es) da escala sem correspondência no ponto.`);
   if(fuzzy.length) warnings.push(`${fuzzy.length} nome(s) conciliado(s) por similaridade aproximada.`);
-  const uniqueWarnings=[...new Set(warnings)];
+  if(missingTurns.size) warnings.push(`Turnos sem horário reconhecido na legenda: ${[...missingTurns].sort().join(', ')}.`);
+
   const raw=1-(deviations+10*nc)/totalMarks;
-  return {adherence:Math.max(0,Math.min(1,raw)),raw,deviations,nc,totalMarks,matched,totalSchedule:schedule.employees.size,warnings:uniqueWarnings,store:schedule.store||point.store||''};
+  return {
+    adherence:Math.max(0,Math.min(1,raw)), raw, deviations, nc, totalMarks,
+    matched, totalSchedule:schedule.employees.size, warnings:[...new Set(warnings)],
+    store:schedule.store||point.store||''
+  };
 }
 
-function setStatus(id,msg,type='muted'){ const el=$(id); el.textContent=msg; el.className=`status ${type}`; }
+function setStatus(id,msg,type='muted'){
+  const el=$(id);
+  el.textContent=msg;
+  el.className=`status ${type}`;
+}
 function updateButton(){ calculateBtn.disabled=!(pointData&&scheduleData); }
 
 pointInput.addEventListener('change',async()=>{
-  const file=pointInput.files[0]; pointData=null; updateButton();
-  $('pointFileName').textContent=file?.name||'Nenhum arquivo selecionado'; if(!file) return;
+  const file=pointInput.files[0];
+  pointData=null;
+  updateButton();
+  $('pointFileName').textContent=file?.name||'Nenhum arquivo selecionado';
+  if(!file) return;
   try{
     setStatus('pointStatus','Lendo PDF…');
-    const pages=await pdfPages(file); pointData=parsePointRows(pages);
+    pointData=parsePointRows(await pdfPages(file));
     setStatus('pointStatus',`✓ ${pointData.employees.size} colaboradores reconhecidos${pointData.store?' • '+pointData.store:''}`,'ok');
-  }catch(e){ console.error(e); setStatus('pointStatus',`Erro: ${e.message}`,'error'); }
+  }catch(e){
+    console.error(e);
+    setStatus('pointStatus',`Erro: ${e.message}`,'error');
+  }
   updateButton();
 });
 
 scheduleInput.addEventListener('change',async()=>{
-  const file=scheduleInput.files[0]; scheduleData=null; updateButton();
-  $('scheduleFileName').textContent=file?.name||'Nenhum arquivo selecionado'; if(!file) return;
+  const file=scheduleInput.files[0];
+  scheduleData=null;
+  updateButton();
+  $('scheduleFileName').textContent=file?.name||'Nenhum arquivo selecionado';
+  if(!file) return;
   try{
     setStatus('scheduleStatus','Lendo escala…');
     if(/\.pdf$/i.test(file.name)) scheduleData=parseSchedulePdfPages(await pdfPages(file));
     else scheduleData=parseScheduleWorkbook(await file.arrayBuffer());
     setStatus('scheduleStatus',`✓ ${scheduleData.employees.size} colaboradores reconhecidos${scheduleData.store?' • '+scheduleData.store:''} • ${scheduleData.source.toUpperCase()}`,'ok');
-  }catch(e){ console.error(e); setStatus('scheduleStatus',`Erro: ${e.message}`,'error'); }
+  }catch(e){
+    console.error(e);
+    setStatus('scheduleStatus',`Erro: ${e.message}`,'error');
+  }
   updateButton();
 });
 
@@ -324,13 +391,20 @@ calculateBtn.addEventListener('click',()=>{
     $('warnings').innerHTML=r.warnings.map(w=>`⚠ ${w}`).join('<br>');
     $('resultCard').classList.remove('hidden');
   }catch(e){
-    $('resultCard').classList.add('hidden'); alert(e.message);
+    $('resultCard').classList.add('hidden');
+    alert(e.message);
   }
 });
 
 $('resetBtn').addEventListener('click',()=>{
-  pointInput.value=''; scheduleInput.value=''; pointData=null; scheduleData=null;
-  $('pointFileName').textContent='Nenhum arquivo selecionado'; $('scheduleFileName').textContent='Nenhum arquivo selecionado';
-  setStatus('pointStatus','Aguardando arquivo'); setStatus('scheduleStatus','Aguardando arquivo');
-  $('resultCard').classList.add('hidden'); updateButton();
+  pointInput.value='';
+  scheduleInput.value='';
+  pointData=null;
+  scheduleData=null;
+  $('pointFileName').textContent='Nenhum arquivo selecionado';
+  $('scheduleFileName').textContent='Nenhum arquivo selecionado';
+  setStatus('pointStatus','Aguardando arquivo');
+  setStatus('scheduleStatus','Aguardando arquivo');
+  $('resultCard').classList.add('hidden');
+  updateButton();
 });
