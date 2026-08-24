@@ -9,108 +9,63 @@
 <body>
   <main class="shell">
     <header class="hero">
-      <div>
-        <p class="eyebrow">MOTOR DE ADERÊNCIA</p>
-        <h1>Aderência de Escala</h1>
-        <p class="subtitle">Cruza o espelho de ponto com a escala planejada e calcula o percentual de aderência.</p>
-      </div>
+      <div><p class="eyebrow">MOTOR DE ADERÊNCIA</p><h1>Aderência de Escala</h1><p class="subtitle">Cruza o espelho de ponto com a escala planejada e calcula o percentual de aderência.</p></div>
       <div class="privacy">Processamento local no navegador</div>
     </header>
 
     <section class="upload-grid">
       <article class="card upload-card">
-        <div class="step">1</div>
-        <h2>Espelho de ponto</h2>
-        <p>PDF mensal com todos os funcionários da loja.</p>
-        <label class="dropzone" for="pointFile">
-          <strong>Selecionar PDF do ponto</strong>
-          <span id="pointFileName">Nenhum arquivo selecionado</span>
-        </label>
+        <div class="upload-heading"><div class="step">1</div><div><h2>Espelho de ponto</h2><p>PDF mensal com todos os funcionários da loja.</p></div></div>
+        <label class="dropzone" for="pointFile"><strong>Selecionar PDF do ponto</strong><span id="pointFileName">Nenhum arquivo selecionado</span></label>
         <input id="pointFile" type="file" accept="application/pdf,.pdf" />
         <div id="pointStatus" class="status muted">Aguardando arquivo</div>
       </article>
-
       <article class="card upload-card">
-        <div class="step">2</div>
-        <h2>Escala planejada</h2>
-        <p>Arquivo Excel/XLSM da escala ou PDF exportado da escala.</p>
-        <label class="dropzone" for="scheduleFile">
-          <strong>Selecionar escala</strong>
-          <span id="scheduleFileName">Nenhum arquivo selecionado</span>
-        </label>
+        <div class="upload-heading"><div class="step">2</div><div><h2>Escala planejada</h2><p>Excel/XLSM ou PDF exportado da escala.</p></div></div>
+        <label class="dropzone" for="scheduleFile"><strong>Selecionar escala</strong><span id="scheduleFileName">Nenhum arquivo selecionado</span></label>
         <input id="scheduleFile" type="file" accept="application/pdf,.pdf,.xlsx,.xlsm,.xls" />
         <div id="scheduleStatus" class="status muted">Aguardando arquivo</div>
       </article>
     </section>
 
-    <section class="actions">
-      <button id="calculateBtn" disabled>Calcular aderência</button>
-      <button id="exportPdfBtn" class="secondary report-button" disabled>Exportar relatório PDF</button>
-      <button id="resetBtn" class="secondary">Limpar</button>
-    </section>
+    <section class="actions"><button id="calculateBtn" disabled>Calcular aderência</button><button id="exportPdfBtn" class="secondary report-button" disabled>Exportar relatório PDF</button><button id="resetBtn" class="secondary">Limpar</button></section>
 
     <section id="analysisArea" class="analysis-area hidden">
       <section id="resultCard" class="result-card hidden" aria-live="polite">
         <div class="result-main">
-          <span class="result-label">ADERÊNCIA</span>
-          <strong id="resultPercent">—</strong>
-          <span id="resultStore" class="result-store"></span>
+          <span class="result-label">ADERÊNCIA</span><strong id="resultPercent">—</strong><span id="resultStore" class="result-store"></span>
+          <div class="adherence-scale" aria-hidden="true"><span class="scale-critical">Crítico</span><span class="scale-attention">Atenção</span><span class="scale-good">Adequado</span></div>
+          <div id="adherenceReading" class="adherence-reading">Indicador principal do período</div>
         </div>
         <div class="result-meta">
-          <div><span>Colaboradores conciliados</span><strong id="matchedPeople">—</strong></div>
-          <div><span>Desvios &gt; 90 min</span><strong id="deviations">—</strong></div>
-          <div><span>Dias de folga/ausência com ponto</span><strong id="nonConformities">—</strong></div>
-          <div><span>Marcações consideradas</span><strong id="totalMarks">—</strong></div>
+          <div><span>Colaboradores conciliados</span><strong id="matchedPeople">—</strong></div><div><span>Desvios &gt; 90 min</span><strong id="deviations">—</strong></div>
+          <div><span>Dias-pessoa com ponto em folga/ausência</span><strong id="nonConformities">—</strong></div><div><span>Marcações consideradas</span><strong id="totalMarks">—</strong></div>
         </div>
         <div id="warnings" class="warnings"></div>
       </section>
 
       <aside id="diagnosticPanel" class="diagnostic-panel card" aria-live="polite">
-        <div class="diagnostic-head">
-          <div>
-            <span class="panel-kicker">CONFIABILIDADE DA LEITURA</span>
-            <strong id="confidencePercent">—</strong>
-          </div>
-          <span id="confidenceBadge" class="confidence-badge neutral">Aguardando</span>
-        </div>
+        <div class="diagnostic-head"><div><span class="panel-kicker">CONFIABILIDADE DA LEITURA</span><strong id="confidencePercent">—</strong></div><span id="confidenceBadge" class="confidence-badge neutral">Aguardando</span></div>
         <div class="confidence-track"><span id="confidenceBar"></span></div>
-
-        <div class="diagnostic-section meta-section">
-          <h3>Metadados</h3>
-          <div class="text-metrics">
-            <div><span>Fonte da escala</span><strong id="metaSource">—</strong></div>
-            <div><span>Loja</span><strong id="metaStore">—</strong></div>
-            <div><span>Período</span><strong id="metaPeriod">—</strong></div>
-            <div><span>Turnos reconhecidos</span><strong id="metaTurns">—</strong></div>
-            <div><span>Marcações no espelho</span><strong id="metaPointMarks">—</strong></div>
-            <div><span>Cobertura analisada</span><strong id="metaCoverage">—</strong></div>
-          </div>
-        </div>
-
-        <div class="diagnostic-section cause-section">
-          <h3>Leitura rápida das causas</h3>
-          <div id="causeSummary" class="cause-summary"><p>Aguardando o cálculo.</p></div>
-        </div>
-
-        <div class="diagnostic-section cargo-section">
-          <h3>Cargos com mais ocorrências</h3>
-          <div id="cargoSummary" class="cargo-summary"><p>Aguardando o cálculo.</p></div>
-        </div>
+        <div class="diagnostic-section meta-section"><h3>Metadados</h3><div class="text-metrics">
+          <div><span>Fonte</span><strong id="metaSource">—</strong></div><div><span>Loja</span><strong id="metaStore">—</strong></div><div><span>Período</span><strong id="metaPeriod">—</strong></div>
+          <div><span>Turnos</span><strong id="metaTurns">—</strong></div><div><span>Marcações no espelho</span><strong id="metaPointMarks">—</strong></div><div><span>Cobertura</span><strong id="metaCoverage">—</strong></div>
+        </div></div>
+        <div class="diagnostic-section cause-section"><h3>Resumo das ocorrências</h3><div id="causeSummary" class="cause-summary"><p>Aguardando o cálculo.</p></div></div>
+        <div class="diagnostic-section cargo-section"><h3>Ocorrências por cargo</h3><div id="cargoSummary" class="cargo-summary"><p>Aguardando o cálculo.</p></div></div>
       </aside>
     </section>
 
-    <details class="card rules">
-      <summary>Regra usada no cálculo</summary>
-      <p>É comparada a primeira entrada real do dia com a entrada prevista na escala. Diferenças de até 90 minutos são toleradas. Diferenças acima de 90 minutos valem 1 ponto de penalidade. Em dias previstos como F, FER, AF, AB, AL, FF, FC, NC ou AE, a existência de ao menos uma batida de ponto gera uma única não conformidade para aquele colaborador/data, independentemente da quantidade de batidas no mesmo dia.</p>
-      <code>Aderência = 1 - (desvios + 10 × não conformidades) / total de marcações</code>
-    </details>
+    <details class="card rules"><summary>Regra usada no cálculo</summary><p>É comparada a primeira entrada real do dia com a entrada prevista na escala. Diferenças de até 90 minutos são toleradas. Diferenças acima de 90 minutos valem 1 ponto. Em F, FER, AF, AB, AL, FF, FC, NC ou AE, ao menos uma batida gera uma única não conformidade por colaborador/data, independentemente da quantidade de batidas.</p><code>Aderência = 1 - (desvios + 10 × não conformidades) / total de marcações</code></details>
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="guard.js"></script>
-  <script src="app.js"></script>
+  <script src="engine-v2.js"></script>
+  <script src="dashboard-enhancements.js"></script>
   <script src="export-report.js"></script>
 </body>
 </html>
