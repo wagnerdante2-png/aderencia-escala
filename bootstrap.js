@@ -8,8 +8,8 @@ function check(){const missing=REQUIRED.filter(([k])=>!window[k]);const optional
 function loadBatch(){if(document.querySelector('script[data-aderencia-batch]'))return;const s=document.createElement('script');s.src='batch.js';s.dataset.aderenciaBatch='1';s.defer=true;document.head.appendChild(s)}
 window.addEventListener('error',e=>console.error('Erro global da aplicação:',e.error||e.message));
 check();
-const badge=document.querySelector('.privacy');if(badge)badge.textContent='Processamento local no navegador • v1.0 RC6';
-/* Adaptador PDF registra captura antes do engine; PDF que falhar não cai silenciosamente no parser legado. */
+const badge=document.querySelector('.privacy');if(badge)badge.textContent='Processamento local no navegador • v1.0 RC7';
+/* O adaptador PDF precisa registrar a captura antes do engine. */
 document.write('<script src="pdf-grid-adapter.js"><\/script>');
 loadBatch();
 })();
