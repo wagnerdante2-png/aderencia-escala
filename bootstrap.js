@@ -5,9 +5,11 @@ const OPTIONAL=[['jspdf','gerador de relatórios PDF'],['Tesseract','OCR de PDF 
 function setStatus(id,text){const e=document.getElementById(id);if(!e)return;e.textContent=text;e.classList.remove('muted','ok');e.classList.add('error')}
 function storageOK(){try{const k='__aderencia_health__';localStorage.setItem(k,'1');localStorage.removeItem(k);return true}catch{return false}}
 function check(){const missing=REQUIRED.filter(([k])=>!window[k]);const optional=OPTIONAL.filter(([k])=>!window[k]);window.ADERENCIA_HEALTH={ok:!missing.length&&storageOK(),missing:missing.map(x=>x[1]),optionalMissing:optional.map(x=>x[1]),storage:storageOK(),checkedAt:new Date().toISOString()};if(missing.length){const msg=`Não foi possível carregar ${missing.map(x=>x[1]).join(' e ')}. Este pacote usa bibliotecas online; verifique a conexão e reabra o index.html.`;setStatus('pointStatus',msg);setStatus('scheduleStatus',msg);document.getElementById('calculateBtn')?.setAttribute('disabled','disabled');alert(msg)}else if(!window.ADERENCIA_HEALTH.storage){alert('O navegador bloqueou o armazenamento local. A análise funcionará, mas o histórico não poderá ser salvo.')}else if(optional.length){console.warn('Recursos opcionais indisponíveis:',optional.map(x=>x[1]).join(', '))}}
-function loadScript(src,dataAttr){if(document.querySelector(`script[${dataAttr}]`))return;const s=document.createElement('script');s.src=src;s.setAttribute(dataAttr,'1');s.defer=true;document.head.appendChild(s)}
+function loadBatch(){if(document.querySelector('script[data-aderencia-batch]'))return;const s=document.createElement('script');s.src='batch.js';s.dataset.aderenciaBatch='1';s.defer=true;document.head.appendChild(s)}
 window.addEventListener('error',e=>console.error('Erro global da aplicação:',e.error||e.message));
 check();
-loadScript('pdf-temporal-guard.js','data-aderencia-temporal');
-loadScript('batch.js','data-aderencia-batch');
+const badge=document.querySelector('.privacy');if(badge)badge.textContent='Processamento local no navegador • v1.0 RC5';
+/* O adaptador precisa registrar o listener de captura antes do engine-v3.js. */
+document.write('<script src="pdf-grid-adapter.js"><\/script>');
+loadBatch();
 })();
