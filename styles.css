@@ -1,0 +1,59 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #18212f;
+  background: #f3f6f9;
+  font-synthesis: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: linear-gradient(180deg,#eef3f7 0,#f8fafc 50%,#f3f6f9 100%); }
+.shell { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding: 48px 0 64px; }
+.hero { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; margin-bottom:30px; }
+.eyebrow { margin:0 0 8px; font-size:12px; font-weight:800; letter-spacing:.16em; color:#5b6d82; }
+h1 { margin:0; font-size:clamp(32px,4vw,52px); line-height:1; letter-spacing:-.04em; }
+.subtitle { max-width:720px; margin:14px 0 0; color:#66768a; font-size:17px; line-height:1.55; }
+.privacy { white-space:nowrap; border:1px solid #d9e2ea; background:#fff; border-radius:999px; padding:10px 14px; font-size:12px; color:#607084; box-shadow:0 4px 14px rgba(24,33,47,.04); }
+.upload-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.card { background:#fff; border:1px solid #dce4eb; border-radius:18px; box-shadow:0 12px 32px rgba(24,33,47,.06); }
+.upload-card { padding:24px; position:relative; }
+.step { width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:#172231; color:#fff; font-weight:800; margin-bottom:18px; }
+h2 { margin:0 0 7px; font-size:20px; }
+.upload-card p { margin:0 0 18px; color:#6a7889; min-height:44px; line-height:1.45; }
+input[type=file] { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+.dropzone { display:flex; min-height:126px; padding:22px; border:1.5px dashed #b8c6d2; border-radius:14px; align-items:center; justify-content:center; flex-direction:column; gap:7px; text-align:center; cursor:pointer; transition:.18s ease; background:#f9fbfc; }
+.dropzone:hover { border-color:#617990; background:#f4f8fb; transform:translateY(-1px); }
+.dropzone strong { font-size:15px; }
+.dropzone span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#7b8998; font-size:12px; }
+.status { margin-top:14px; min-height:21px; font-size:13px; font-weight:650; }
+.status.muted { color:#8a98a8; }
+.status.ok { color:#18794e; }
+.status.error { color:#b42318; }
+.actions { display:flex; gap:12px; justify-content:flex-end; margin:20px 0; }
+button { appearance:none; border:0; border-radius:12px; padding:13px 20px; font-size:14px; font-weight:800; background:#172231; color:#fff; cursor:pointer; transition:.15s ease; }
+button:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 8px 18px rgba(24,33,47,.13); }
+button:disabled { opacity:.38; cursor:not-allowed; }
+button.secondary { background:#fff; color:#354458; border:1px solid #d7e0e8; }
+.result-card { display:grid; grid-template-columns:280px 1fr; gap:24px; padding:26px; border-radius:20px; background:#14202d; color:#fff; box-shadow:0 18px 44px rgba(20,32,45,.2); margin:16px 0 20px; }
+.hidden { display:none !important; }
+.result-main { display:flex; flex-direction:column; justify-content:center; border-right:1px solid rgba(255,255,255,.13); padding-right:24px; }
+.result-label { color:#aebbc8; font-size:11px; font-weight:800; letter-spacing:.15em; }
+#resultPercent { display:block; font-size:58px; line-height:1; letter-spacing:-.06em; margin:9px 0 8px; }
+.result-store { color:#b8c6d3; font-size:13px; }
+.result-meta { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.result-meta div { padding:14px 16px; background:rgba(255,255,255,.065); border-radius:12px; }
+.result-meta span { display:block; color:#abb9c6; font-size:11px; margin-bottom:7px; }
+.result-meta strong { font-size:21px; }
+.warnings { grid-column:1 / -1; color:#f3c892; font-size:12px; line-height:1.5; }
+.warnings:empty { display:none; }
+.rules { padding:0 22px; }
+.rules summary { cursor:pointer; padding:18px 0; font-weight:750; }
+.rules p { color:#66768a; line-height:1.6; }
+.rules code { display:block; margin:0 0 20px; padding:14px; border-radius:10px; background:#f4f7f9; overflow:auto; }
+@media (max-width:760px) {
+  .shell { width:min(100% - 24px,1120px); padding-top:26px; }
+  .hero { flex-direction:column; }
+  .privacy { white-space:normal; }
+  .upload-grid { grid-template-columns:1fr; }
+  .result-card { grid-template-columns:1fr; }
+  .result-main { border-right:0; border-bottom:1px solid rgba(255,255,255,.13); padding:0 0 20px; }
+  .result-meta { grid-template-columns:1fr; }
+}
