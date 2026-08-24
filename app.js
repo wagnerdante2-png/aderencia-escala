@@ -22,6 +22,8 @@
   let scheduleData = null;
 
   const NON_WORK_CODES = new Set(['F', 'FER', 'AF', 'AB', 'AL', 'FF', 'FC', 'NC', 'AE']);
+  const DAY_WITHOUT_FIXED_TIME_CODES = new Set(['D']);
+  const SCHEDULE_CODE_RE = /^(?:T\d{1,2}|F|FER|AF|AB|AL|FF|FC|NC|AE|D)$/i;
   const MONTHS = {
     JANEIRO: 0, FEVEREIRO: 1, MARCO: 2, MARÇO: 2, ABRIL: 3, MAIO: 4, JUNHO: 5,
     JULHO: 6, AGOSTO: 7, SETEMBRO: 8, OUTUBRO: 9, NOVEMBRO: 10, DEZEMBRO: 11
@@ -60,6 +62,10 @@
     return `${(v * 100).toFixed(2).replace('.', ',')}%`;
   }
 
+  function fmtPct1(v) {
+    return `${(v * 100).toFixed(1).replace('.', ',')}%`;
+  }
+
   function levenshtein(a, b) {
     const m = a.length;
     const n = b.length;
@@ -79,6 +85,14 @@
 
   function similarity(a, b) {
     return 1 - levenshtein(a, b) / Math.max(a.length, b.length, 1);
+  }
+
+  function tokenSimilarity(a, b) {
+    const aa = new Set(a.split(' ').filter(Boolean));
+    const bb = new Set(b.split(' ').filter(Boolean));
+    const common = [...aa].filter(x => bb.has(x)).length;
+    const union = new Set([...aa, ...bb]).size || 1;
+    return common / union;
   }
 
   function setStatus(id, text, ok) {
@@ -133,7 +147,7 @@
       employees: new Map(), warnings: []
     };
     let current = null;
-    let inDailyTable = true;
+    let inDailyTable = false;
 
     for (const page of pages) {
       for (const row of page.rows) {
@@ -159,7 +173,7 @@
               });
             }
             current = result.employees.get(key);
-            inDailyTable = true;
+            inDailyTable = false;
           }
           continue;
         }
@@ -172,6 +186,10 @@
           if (!result.store) result.store = current.store;
         }
 
+        if (/^Data\s+Dia\s+1a\s+E\./i.test(line)) {
+          inDailyTable = true;
+          continue;
+        }
         if (/^Hor[aá]rios\b/i.test(line) || /^(?:C[oó]digo\s+Descri[cç][aã]o|Assinatura)/i.test(line)) {
           inDailyTable = false;
           continue;
@@ -194,6 +212,9 @@
 
     if (!result.employees.size) {
       throw new Error('Não encontrei blocos de funcionários no espelho de ponto.');
+    }
+    if (!result.periodStart || !result.periodEnd) {
+      throw new Error('Não consegui identificar o período do espelho de ponto.');
     }
     return result;
   }
@@ -235,7 +256,7 @@
     const clean = String(text).replace(/\r/g, '');
     const patterns = [
       /\b(T\d{1,2})\s*(?:\||-|:)?\s*([0-2]\d:[0-5]\d)\s*(?:A|À|AS|ÀS|-)\s*([0-2]\d:[0-5]\d)/gi,
-      /\b(T\d{1,2})\b[^\n]{0,35}?([0-2]\d:[0-5]\d)[^\n]{0,12}?([0-2]\d:[0-5]\d)/gi
+      /\b(T\d{1,2})\b[^\n]{0,40}?([0-2]\d:[0-5]\d)[^\n]{0,16}?([0-2]\d:[0-5]\d)/gi
     ];
 
     for (const re of patterns) {
@@ -245,6 +266,13 @@
       }
     }
     return turns;
+  }
+
+  function mergeTurns(target, source) {
+    for (const [code, turn] of source) {
+      if (!target.has(code)) target.set(code, turn);
+    }
+    return target;
   }
 
   function detectStore(text) {
@@ -270,7 +298,7 @@
 
       const headerY = nomeItem.y;
       let dayItems = page.items
-        .filter(i => Math.abs(i.y - headerY) < 15 && /^\d{1,2}$/.test(i.text) && Number(i.text) >= 1 && Number(i.text) <= 31 && i.x > cargoItem.x + 20)
+        .filter(i => Math.abs(i.y - headerY) < 16 && /^\d{1,2}$/.test(i.text) && Number(i.text) >= 1 && Number(i.text) <= 31 && i.x > cargoItem.x + 20)
         .sort((a, b) => a.x - b.x);
 
       const uniqueDays = [];
@@ -288,8 +316,7 @@
         if (row.y >= headerY - 3) continue;
 
         const codes = row.items.filter(i =>
-          i.x >= firstDayX - 10 && i.x <= lastDayX + 20 &&
-          /^(?:T\d{1,2}|F|FER|AF|AB|AL|FF|FC|NC|AE)$/i.test(i.text)
+          i.x >= firstDayX - 10 && i.x <= lastDayX + 20 && SCHEDULE_CODE_RE.test(i.text)
         );
         if (codes.length < 5) continue;
 
@@ -350,12 +377,11 @@
     }
     const serial = serialToIso(v);
     if (serial) return serial;
-    const br = isoFromBR(v);
-    return br;
+    return isoFromBR(v);
   }
 
   function locateScheduleGrid(rows) {
-    const limit = Math.min(rows.length, 180);
+    const limit = Math.min(rows.length, 220);
     let best = null;
 
     for (let r = 0; r < limit; r++) {
@@ -381,57 +407,128 @@
     return best;
   }
 
+  function parseTurnLegendFromWorkbook(wb, chosenSheetName) {
+    const turns = new Map();
+    const preferred = [chosenSheetName, 'Escala Mensal', 'Escala Ponto']
+      .filter(Boolean)
+      .concat(wb.SheetNames)
+      .filter((name, idx, arr) => arr.indexOf(name) === idx);
+
+    for (const sheetName of preferred) {
+      const ws = wb.Sheets[sheetName];
+      if (!ws) continue;
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+      for (const row of rows) {
+        for (const value of row || []) {
+          const s = String(value == null ? '' : value).trim();
+          if (!/\bT\d{1,2}\b/i.test(s) || !/[0-2]\d:[0-5]\d/.test(s)) continue;
+          mergeTurns(turns, parseTurnLegend(s));
+        }
+      }
+      if (turns.size >= 30) break;
+    }
+    return turns;
+  }
+
+  function detectWorkbookStore(wb, chosen) {
+    const preferred = [chosen && chosen.sheetName, 'Escala Mensal', 'Escala Ponto', 'Configuração'].filter(Boolean);
+    for (const sheetName of [...new Set(preferred)]) {
+      const ws = wb.Sheets[sheetName];
+      if (!ws) continue;
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, range: 0 });
+      const top = rows.slice(0, 15).map(r => (r || []).slice(0, 50).join(' | ')).join('\n');
+      const store = detectStore(top);
+      if (store) return store;
+    }
+
+    if (chosen && /ANDAR NO TEMPO/i.test(norm(chosen.sheetName))) {
+      const rows = chosen.rows;
+      for (let r = 0; r < Math.min(12, rows.length); r++) {
+        for (let c = 0; c < Math.min(5, (rows[r] || []).length); c++) {
+          const v = rows[r][c];
+          const n = Number(v);
+          if (Number.isInteger(n) && n >= 1 && n <= 999) {
+            return `ML${String(n).padStart(2, '0')}`;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function findBestDateRow(rows, grid) {
+    let best = null;
+    const startRow = Math.max(0, Math.min(grid.nameRow, grid.cargoRow) - 5);
+    const endRow = Math.min(rows.length - 1, Math.max(grid.nameRow, grid.cargoRow) + 5);
+
+    for (let r = startRow; r <= endRow; r++) {
+      const candidates = [];
+      let realDates = 0;
+      for (let c = Math.max(grid.nameCol, grid.cargoCol) + 1; c < (rows[r] || []).length; c++) {
+        const v = rows[r][c];
+        const iso = dateFromCell(v);
+        const n = Number(cellText(v));
+        if (iso) {
+          candidates.push({ c, date: iso });
+          realDates++;
+        } else if (Number.isInteger(n) && n >= 1 && n <= 31) {
+          candidates.push({ c, day: n });
+        }
+      }
+      const score = realDates * 3 + candidates.length;
+      if (!best || score > best.score) best = { r, candidates, realDates, score };
+    }
+    return best;
+  }
+
   function parseScheduleWorkbook(buffer) {
     const wb = XLSX.read(buffer, { type: 'array', cellDates: true, cellFormula: true });
     let chosen = null;
+    const orderedSheets = ['Andar no Tempo', 'Escala Ponto', 'Escala Mensal']
+      .concat(wb.SheetNames)
+      .filter((name, idx, arr) => arr.indexOf(name) === idx);
 
-    for (const sheetName of wb.SheetNames) {
+    for (const sheetName of orderedSheets) {
       const ws = wb.Sheets[sheetName];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
       const grid = locateScheduleGrid(rows);
       if (!grid) continue;
 
+      const dateRow = findBestDateRow(rows, grid);
+      if (!dateRow || dateRow.candidates.length < 20) continue;
+
       let codeCount = 0;
-      for (const row of rows.slice(grid.nameRow + 1, grid.nameRow + 80)) {
+      const dataStart = Math.max(grid.nameRow, grid.cargoRow) + 1;
+      for (const row of rows.slice(dataStart, dataStart + 120)) {
         for (const v of row || []) {
-          if (/^(?:T\d{1,2}|F|FER|AF|AB|AL|FF|FC|NC|AE)$/i.test(cellText(v))) codeCount++;
+          if (SCHEDULE_CODE_RE.test(cellText(v))) codeCount++;
         }
       }
-      const score = grid.score + codeCount;
-      if (!chosen || score > chosen.score) chosen = { sheetName, rows, grid, score };
+
+      const annualBonus = dateRow.realDates >= 300 ? 100000 : 0;
+      const score = annualBonus + dateRow.realDates * 30 + dateRow.candidates.length * 5 + codeCount + grid.score;
+      if (!chosen || score > chosen.score) chosen = { sheetName, rows, grid, dateRow, score };
+      if (dateRow.realDates >= 300 && codeCount >= 100) break;
     }
 
     if (!chosen) throw new Error('Não encontrei uma aba com a estrutura da Escala Operacional.');
 
+    const workbookTurns = parseTurnLegendFromWorkbook(wb, chosen.sheetName);
     const rows = chosen.rows;
     const grid = chosen.grid;
     const text = rows.map(r => (r || []).map(cellText).join(' | ')).join('\n');
+    const turns = new Map();
+    mergeTurns(turns, workbookTurns);
+    mergeTurns(turns, parseTurnLegend(text));
+
     const result = {
       type: 'schedule', source: 'excel', sheet: chosen.sheetName,
-      store: detectStore(text), periodStart: null, periodEnd: null,
-      employees: new Map(), turns: parseTurnLegend(text), warnings: []
+      store: detectWorkbookStore(wb, chosen), periodStart: null, periodEnd: null,
+      employees: new Map(), turns, warnings: []
     };
 
     const { month, year } = inferMonthYear(text);
-
-    let dateRowIndex = -1;
-    let dateCols = [];
-    for (let r = Math.max(0, Math.min(grid.nameRow, grid.cargoRow) - 4); r <= Math.min(rows.length - 1, Math.max(grid.nameRow, grid.cargoRow) + 4); r++) {
-      const candidates = [];
-      for (let c = Math.max(grid.nameCol, grid.cargoCol) + 1; c < (rows[r] || []).length; c++) {
-        const v = rows[r][c];
-        const iso = dateFromCell(v);
-        const n = Number(cellText(v));
-        if (iso) candidates.push({ c, date: iso });
-        else if (Number.isInteger(n) && n >= 1 && n <= 31) candidates.push({ c, day: n });
-      }
-      if (candidates.length > dateCols.length) {
-        dateRowIndex = r;
-        dateCols = candidates;
-      }
-    }
-
-    if (dateCols.length < 20) throw new Error('Não consegui identificar as datas da escala Excel.');
+    let dateCols = chosen.dateRow.candidates;
 
     if (!dateCols.some(x => x.date)) {
       const built = buildDates(dateCols.map(x => x.day), month, year);
@@ -439,6 +536,8 @@
     } else {
       dateCols = dateCols.filter(x => x.date);
     }
+
+    if (dateCols.length < 20) throw new Error('Não consegui identificar as datas da escala Excel.');
 
     const dataStartRow = Math.max(grid.nameRow, grid.cargoRow) + 1;
     for (let r = dataStartRow; r < rows.length; r++) {
@@ -450,9 +549,7 @@
       const recognized = [];
       for (const d of dateCols) {
         const code = norm(cellText((rows[r] || [])[d.c]));
-        if (/^(?:T\d{1,2}|F|FER|AF|AB|AL|FF|FC|NC|AE)$/.test(code)) {
-          recognized.push({ date: d.date, code });
-        }
+        if (SCHEDULE_CODE_RE.test(code)) recognized.push({ date: d.date, code });
       }
       if (recognized.length < 5) continue;
 
@@ -475,16 +572,43 @@
 
   function findPointEmployee(scheduleEmp, points, used) {
     if (points.has(scheduleEmp.key) && !used.has(scheduleEmp.key)) {
-      return { emp: points.get(scheduleEmp.key), key: scheduleEmp.key, confidence: 1 };
+      return { emp: points.get(scheduleEmp.key), key: scheduleEmp.key, confidence: 1, mode: 'exato' };
     }
 
-    let best = null;
+    const prefixMatches = [];
     for (const [key, p] of points) {
       if (used.has(key)) continue;
-      const s = similarity(scheduleEmp.key, key);
-      if (!best || s > best.confidence) best = { emp: p, key, confidence: s };
+      const shorter = Math.min(scheduleEmp.key.length, key.length);
+      if (shorter >= 12 && (scheduleEmp.key.startsWith(key) || key.startsWith(scheduleEmp.key))) {
+        prefixMatches.push({ emp: p, key, confidence: shorter / Math.max(scheduleEmp.key.length, key.length), mode: 'nome truncado' });
+      }
     }
-    return best && best.confidence >= 0.92 ? best : null;
+    if (prefixMatches.length === 1) return prefixMatches[0];
+
+    const candidates = [];
+    for (const [key, p] of points) {
+      if (used.has(key)) continue;
+      const lev = similarity(scheduleEmp.key, key);
+      const tok = tokenSimilarity(scheduleEmp.key, key);
+      const score = lev * 0.65 + tok * 0.35;
+      candidates.push({ emp: p, key, confidence: score, mode: 'aproximado' });
+    }
+    candidates.sort((a, b) => b.confidence - a.confidence);
+    const best = candidates[0];
+    const second = candidates[1];
+    if (best && best.confidence >= 0.94 && (!second || best.confidence - second.confidence >= 0.04)) return best;
+    return null;
+  }
+
+  function countPointMarksInPeriod(point, start, end) {
+    let total = 0;
+    for (const emp of point.employees.values()) {
+      for (const [date, day] of emp.days) {
+        if (date < start || date > end) continue;
+        total += day.marks.length;
+      }
+    }
+    return total;
   }
 
   function calculate() {
@@ -494,41 +618,49 @@
     if (pointData.store && scheduleData.store && pointData.store !== scheduleData.store) {
       throw new Error(`Arquivos de lojas diferentes: ponto ${pointData.store} e escala ${scheduleData.store}.`);
     }
+    if (!pointData.store || !scheduleData.store) {
+      throw new Error('Não foi possível validar a loja nos dois arquivos. Para um cálculo confiável, a loja precisa ser identificável no ponto e na escala.');
+    }
 
-    const start = [pointData.periodStart, scheduleData.periodStart].filter(Boolean).sort().pop() || null;
-    const end = [pointData.periodEnd, scheduleData.periodEnd].filter(Boolean).sort()[0] || null;
-    if (start && end && start > end) {
-      throw new Error('Os períodos do ponto e da escala não possuem datas em comum.');
+    const start = pointData.periodStart;
+    const end = pointData.periodEnd;
+    if (!start || !end) throw new Error('Período do espelho de ponto não identificado.');
+
+    if (!scheduleData.periodStart || !scheduleData.periodEnd || scheduleData.periodStart > start || scheduleData.periodEnd < end) {
+      throw new Error(`A escala não cobre todo o período do espelho (${start.split('-').reverse().join('/')} a ${end.split('-').reverse().join('/')}). Use a escala correspondente ao mesmo período.`);
     }
 
     const used = new Set();
     let matched = 0;
+    let truncatedMatches = 0;
+    let approximateMatches = 0;
     let deviations = 0;
     let nonConformities = 0;
     let totalMarks = 0;
     let unresolvedTurns = 0;
-    const unmatched = [];
+    let unevaluableMarks = 0;
+    const unmatchedSchedule = [];
 
     for (const scheduleEmp of scheduleData.employees.values()) {
       const match = findPointEmployee(scheduleEmp, pointData.employees, used);
       if (!match) {
-        unmatched.push(scheduleEmp.name);
+        unmatchedSchedule.push(scheduleEmp.name);
         continue;
       }
 
       used.add(match.key);
       matched++;
+      if (match.mode === 'nome truncado') truncatedMatches++;
+      if (match.mode === 'aproximado') approximateMatches++;
 
       for (const [date, sday] of scheduleEmp.days) {
-        if (start && date < start) continue;
-        if (end && date > end) continue;
+        if (date < start || date > end) continue;
 
         const pday = match.emp.days.get(date);
         if (!pday || !pday.marks.length) continue;
 
-        totalMarks += pday.marks.length;
-
         if (NON_WORK_CODES.has(sday.code)) {
+          totalMarks += pday.marks.length;
           nonConformities++;
           continue;
         }
@@ -536,25 +668,55 @@
         if (/^T\d{1,2}$/.test(sday.code)) {
           if (!sday.start) {
             unresolvedTurns++;
+            unevaluableMarks += pday.marks.length;
             continue;
           }
+          totalMarks += pday.marks.length;
           if (pday.firstEntry && timeDiff(sday.start, pday.firstEntry) > 90) deviations++;
+          continue;
         }
+
+        if (DAY_WITHOUT_FIXED_TIME_CODES.has(sday.code)) {
+          unevaluableMarks += pday.marks.length;
+          continue;
+        }
+
+        unevaluableMarks += pday.marks.length;
       }
     }
 
     if (!matched) throw new Error('Nenhum colaborador pôde ser conciliado entre a escala e o espelho de ponto.');
+    if (unresolvedTurns) {
+      throw new Error(`${unresolvedTurns} dia(s) com marcação possuem turno T sem horário reconhecido. O cálculo foi bloqueado para evitar um percentual incorreto.`);
+    }
     if (!totalMarks) throw new Error('Não encontrei marcações utilizáveis nas datas conciliadas.');
 
-    if (unmatched.length) warnings.push(`${unmatched.length} colaborador(es) da escala não foram conciliados por nome.`);
-    if (unresolvedTurns) warnings.push(`${unresolvedTurns} dia(s) tinham código de turno sem horário reconhecido na legenda e não foram penalizados.`);
-    if (!pointData.store || !scheduleData.store) warnings.push('Não foi possível validar automaticamente a loja em um dos arquivos.');
+    const totalPointMarks = countPointMarksInPeriod(pointData, start, end);
+    const markCoverage = totalPointMarks ? totalMarks / totalPointMarks : 0;
+    if (markCoverage < 0.98) {
+      throw new Error(`Cobertura insuficiente para um resultado confiável: apenas ${fmtPct1(markCoverage)} das marcações do espelho puderam ser cruzadas (${totalMarks}/${totalPointMarks}). Verifique colaboradores/turnos não conciliados.`);
+    }
+
+    const pointOnly = [...pointData.employees.entries()]
+      .filter(([key]) => !used.has(key))
+      .map(([, emp]) => ({
+        name: emp.name,
+        marks: [...emp.days.entries()].reduce((sum, [date, day]) => sum + (date >= start && date <= end ? day.marks.length : 0), 0)
+      }))
+      .filter(x => x.marks > 0);
+
+    if (truncatedMatches) warnings.push(`${truncatedMatches} nome(s) truncado(s) no PDF foram conciliados com segurança pelo prefixo do nome.`);
+    if (approximateMatches) warnings.push(`${approximateMatches} nome(s) foram conciliados por similaridade controlada.`);
+    if (unmatchedSchedule.length) warnings.push(`${unmatchedSchedule.length} colaborador(es) da escala não aparecem no espelho; sem marcações, não alteram o denominador.`);
+    if (pointOnly.length) warnings.push(`${pointOnly.length} colaborador(es) do ponto não aparecem na escala; cobertura final das marcações: ${fmtPct1(markCoverage)}.`);
+    if (unevaluableMarks) warnings.push(`${unevaluableMarks} marcação(ões) de códigos sem horário fixo foram excluídas do denominador.`);
+    warnings.unshift(`Validação automática OK • loja ${pointData.store} • período completo • cobertura ${fmtPct1(markCoverage)} • ${scheduleData.turns.size} turnos reconhecidos.`);
 
     const adherence = 1 - (deviations + 10 * nonConformities) / totalMarks;
 
     $('resultPercent').textContent = fmtPct(adherence);
     $('resultStore').textContent = scheduleData.store || pointData.store || '';
-    $('matchedPeople').textContent = `${matched}/${scheduleData.employees.size}`;
+    $('matchedPeople').textContent = `${matched}/${pointData.employees.size}`;
     $('deviations').textContent = String(deviations);
     $('nonConformities').textContent = String(nonConformities);
     $('totalMarks').textContent = String(totalMarks);
@@ -577,7 +739,8 @@
       setStatus('pointStatus', 'Lendo PDF...', false);
       const pages = await pdfPages(file);
       pointData = parsePointPages(pages);
-      setStatus('pointStatus', `Reconhecido: ${pointData.employees.size} funcionário(s)${pointData.store ? ` • ${pointData.store}` : ''}`, true);
+      const total = countPointMarksInPeriod(pointData, pointData.periodStart, pointData.periodEnd);
+      setStatus('pointStatus', `Reconhecido: ${pointData.employees.size} funcionário(s) • ${pointData.store || 'loja não identificada'} • ${total} marcações`, true);
     } catch (err) {
       setStatus('pointStatus', `Erro: ${err.message}`, false);
       alert(err.message);
@@ -606,7 +769,10 @@
       } else {
         throw new Error('Formato de escala não suportado. Use PDF, XLSX, XLSM ou XLS.');
       }
-      setStatus('scheduleStatus', `Reconhecida: ${scheduleData.employees.size} funcionário(s)${scheduleData.store ? ` • ${scheduleData.store}` : ''}`, true);
+      const period = scheduleData.periodStart && scheduleData.periodEnd
+        ? ` • ${scheduleData.periodStart.split('-').reverse().join('/')} a ${scheduleData.periodEnd.split('-').reverse().join('/')}`
+        : '';
+      setStatus('scheduleStatus', `Reconhecida: ${scheduleData.employees.size} funcionário(s) • ${scheduleData.store || 'loja não identificada'} • ${scheduleData.turns.size} turnos${period}`, true);
     } catch (err) {
       setStatus('scheduleStatus', `Erro: ${err.message}`, false);
       alert(err.message);
@@ -618,6 +784,7 @@
     try {
       calculate();
     } catch (err) {
+      $('resultCard').classList.add('hidden');
       alert(err.message);
     }
   });
@@ -631,6 +798,8 @@
     $('scheduleFileName').textContent = 'Nenhum arquivo selecionado';
     $('pointStatus').textContent = 'Aguardando arquivo';
     $('scheduleStatus').textContent = 'Aguardando arquivo';
+    $('pointStatus').classList.remove('ok');
+    $('scheduleStatus').classList.remove('ok');
     $('resultCard').classList.add('hidden');
     updateCalculateState();
   });
