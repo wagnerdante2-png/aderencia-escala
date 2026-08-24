@@ -12,7 +12,7 @@ function check(){
   else if(!storage)alert('O navegador bloqueou o armazenamento local. A análise funcionará, mas o histórico não poderá ser salvo.');
   else if(optional.length)console.warn('Recursos opcionais indisponíveis:',optional.map(x=>x[1]).join(', '));
 }
-function loadBatch(){window.addEventListener('load',()=>{const s=document.createElement('script');s.src='batch.js';s.onerror=()=>console.warn('Módulo de processamento em lote não carregado.');document.body.appendChild(s)})}
+function loadRc3Fixes(){window.addEventListener('load',()=>{if(document.querySelector('script[data-rc3]'))return;const s=document.createElement('script');s.src='engine-rc3-fixes.js';s.dataset.rc3='1';s.onerror=()=>console.warn('Ajustes RC3 não carregados.');document.body.appendChild(s)})}
 window.addEventListener('error',e=>console.error('Erro global da aplicação:',e.error||e.message));
-check();loadBatch();
+check();loadRc3Fixes();
 })();
