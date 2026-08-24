@@ -1,4 +1,4 @@
-ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL
+ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC
 
 1. Baixe o repositório em ZIP pelo GitHub.
 2. Extraia a pasta.
@@ -6,7 +6,12 @@ ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL
 4. Selecione o PDF do espelho de ponto.
 5. Selecione a escala em PDF, XLSX, XLSM ou XLS.
 6. Clique em Calcular aderência.
+7. Se desejar manter o resultado, confirme a competência e clique em Salvar resultado.
 
 Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
 
-Observação: as bibliotecas PDF.js e SheetJS são carregadas pela internet quando a página abre. Os arquivos escolhidos permanecem no navegador e não são enviados para um servidor por este aplicativo.
+IMPORTANTE
+- A competência segue o mês de fechamento: 11/06 a 10/07 = Julho.
+- O histórico fica no armazenamento local do navegador.
+- Use o botão Backup periodicamente e antes de mover a pasta, trocar de navegador/computador ou limpar dados do navegador.
+- O aplicativo usa bibliotecas carregadas pela internet na abertura (PDF.js, SheetJS, jsPDF e OCR). Os arquivos selecionados são processados no navegador e não são enviados por este aplicativo para um backend.
