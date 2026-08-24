@@ -58,7 +58,7 @@
         <div class="result-meta">
           <div><span>Colaboradores conciliados</span><strong id="matchedPeople">—</strong></div>
           <div><span>Desvios &gt; 90 min</span><strong id="deviations">—</strong></div>
-          <div><span>Folgas/ausências com marcação</span><strong id="nonConformities">—</strong></div>
+          <div><span>Dias de folga/ausência com ponto</span><strong id="nonConformities">—</strong></div>
           <div><span>Marcações consideradas</span><strong id="totalMarks">—</strong></div>
         </div>
         <div id="warnings" class="warnings"></div>
@@ -74,7 +74,7 @@
         </div>
         <div class="confidence-track"><span id="confidenceBar"></span></div>
 
-        <div class="diagnostic-section">
+        <div class="diagnostic-section meta-section">
           <h3>Metadados</h3>
           <div class="text-metrics">
             <div><span>Fonte da escala</span><strong id="metaSource">—</strong></div>
@@ -86,12 +86,12 @@
           </div>
         </div>
 
-        <div class="diagnostic-section">
+        <div class="diagnostic-section cause-section">
           <h3>Leitura rápida das causas</h3>
           <div id="causeSummary" class="cause-summary"><p>Aguardando o cálculo.</p></div>
         </div>
 
-        <div class="diagnostic-section">
+        <div class="diagnostic-section cargo-section">
           <h3>Cargos com mais ocorrências</h3>
           <div id="cargoSummary" class="cargo-summary"><p>Aguardando o cálculo.</p></div>
         </div>
@@ -100,7 +100,7 @@
 
     <details class="card rules">
       <summary>Regra usada no cálculo</summary>
-      <p>É comparada a primeira entrada real do dia com a entrada prevista na escala. Diferenças de até 90 minutos são toleradas. Diferenças acima de 90 minutos valem 1 ponto de penalidade. Se houver marcação em dia identificado na escala como folga, férias, afastamento, abono ou outra ausência planejada, são aplicados 10 pontos.</p>
+      <p>É comparada a primeira entrada real do dia com a entrada prevista na escala. Diferenças de até 90 minutos são toleradas. Diferenças acima de 90 minutos valem 1 ponto de penalidade. Em dias previstos como F, FER, AF, AB, AL, FF, FC, NC ou AE, a existência de ao menos uma batida de ponto gera uma única não conformidade para aquele colaborador/data, independentemente da quantidade de batidas no mesmo dia.</p>
       <code>Aderência = 1 - (desvios + 10 × não conformidades) / total de marcações</code>
     </details>
   </main>
@@ -111,5 +111,6 @@
   <script src="guard.js"></script>
   <script src="app.js"></script>
   <script src="engine-v2.js"></script>
+  <script src="ui-polish.js"></script>
 </body>
 </html>
