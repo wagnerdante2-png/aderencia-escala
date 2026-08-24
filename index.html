@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aderência de Escala</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">MOTOR DE ADERÊNCIA</p>
+        <h1>Aderência de Escala</h1>
+        <p class="subtitle">Cruza o espelho de ponto com a escala planejada e calcula o percentual de aderência.</p>
+      </div>
+      <div class="privacy">Processamento local no navegador</div>
+    </header>
+
+    <section class="upload-grid">
+      <article class="card upload-card">
+        <div class="step">1</div>
+        <h2>Espelho de ponto</h2>
+        <p>PDF mensal com todos os funcionários da loja.</p>
+        <label class="dropzone" for="pointFile">
+          <strong>Selecionar PDF do ponto</strong>
+          <span id="pointFileName">Nenhum arquivo selecionado</span>
+        </label>
+        <input id="pointFile" type="file" accept="application/pdf,.pdf" />
+        <div id="pointStatus" class="status muted">Aguardando arquivo</div>
+      </article>
+
+      <article class="card upload-card">
+        <div class="step">2</div>
+        <h2>Escala planejada</h2>
+        <p>Arquivo Excel/XLSM da escala ou PDF exportado da escala.</p>
+        <label class="dropzone" for="scheduleFile">
+          <strong>Selecionar escala</strong>
+          <span id="scheduleFileName">Nenhum arquivo selecionado</span>
+        </label>
+        <input id="scheduleFile" type="file" accept="application/pdf,.pdf,.xlsx,.xlsm,.xls" />
+        <div id="scheduleStatus" class="status muted">Aguardando arquivo</div>
+      </article>
+    </section>
+
+    <section class="actions">
+      <button id="calculateBtn" disabled>Calcular aderência</button>
+      <button id="resetBtn" class="secondary">Limpar</button>
+    </section>
+
+    <section id="resultCard" class="result-card hidden" aria-live="polite">
+      <div class="result-main">
+        <span class="result-label">ADERÊNCIA</span>
+        <strong id="resultPercent">—</strong>
+        <span id="resultStore" class="result-store"></span>
+      </div>
+      <div class="result-meta">
+        <div><span>Colaboradores conciliados</span><strong id="matchedPeople">—</strong></div>
+        <div><span>Desvios &gt; 90 min</span><strong id="deviations">—</strong></div>
+        <div><span>Não conformidades</span><strong id="nonConformities">—</strong></div>
+        <div><span>Marcações consideradas</span><strong id="totalMarks">—</strong></div>
+      </div>
+      <div id="warnings" class="warnings"></div>
+    </section>
+
+    <details class="card rules">
+      <summary>Regra usada no cálculo</summary>
+      <p>É comparada a primeira entrada real do dia com a entrada prevista na escala. Diferenças de até 90 minutos são toleradas. Diferenças acima de 90 minutos valem 1 ponto de penalidade. Se houver marcação em dia identificado na escala como folga, férias, afastamento, abono ou outra ausência planejada, são aplicados 10 pontos.</p>
+      <code>Aderência = 1 - (desvios + 10 × não conformidades) / total de marcações</code>
+    </details>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
