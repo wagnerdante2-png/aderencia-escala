@@ -48,19 +48,54 @@
       <button id="resetBtn" class="secondary">Limpar</button>
     </section>
 
-    <section id="resultCard" class="result-card hidden" aria-live="polite">
-      <div class="result-main">
-        <span class="result-label">ADERÊNCIA</span>
-        <strong id="resultPercent">—</strong>
-        <span id="resultStore" class="result-store"></span>
-      </div>
-      <div class="result-meta">
-        <div><span>Colaboradores conciliados</span><strong id="matchedPeople">—</strong></div>
-        <div><span>Desvios &gt; 90 min</span><strong id="deviations">—</strong></div>
-        <div><span>Não conformidades</span><strong id="nonConformities">—</strong></div>
-        <div><span>Marcações consideradas</span><strong id="totalMarks">—</strong></div>
-      </div>
-      <div id="warnings" class="warnings"></div>
+    <section id="analysisArea" class="analysis-area hidden">
+      <section id="resultCard" class="result-card hidden" aria-live="polite">
+        <div class="result-main">
+          <span class="result-label">ADERÊNCIA</span>
+          <strong id="resultPercent">—</strong>
+          <span id="resultStore" class="result-store"></span>
+        </div>
+        <div class="result-meta">
+          <div><span>Colaboradores conciliados</span><strong id="matchedPeople">—</strong></div>
+          <div><span>Desvios &gt; 90 min</span><strong id="deviations">—</strong></div>
+          <div><span>Folgas/ausências com marcação</span><strong id="nonConformities">—</strong></div>
+          <div><span>Marcações consideradas</span><strong id="totalMarks">—</strong></div>
+        </div>
+        <div id="warnings" class="warnings"></div>
+      </section>
+
+      <aside id="diagnosticPanel" class="diagnostic-panel card" aria-live="polite">
+        <div class="diagnostic-head">
+          <div>
+            <span class="panel-kicker">CONFIABILIDADE DA LEITURA</span>
+            <strong id="confidencePercent">—</strong>
+          </div>
+          <span id="confidenceBadge" class="confidence-badge neutral">Aguardando</span>
+        </div>
+        <div class="confidence-track"><span id="confidenceBar"></span></div>
+
+        <div class="diagnostic-section">
+          <h3>Metadados</h3>
+          <div class="text-metrics">
+            <div><span>Fonte da escala</span><strong id="metaSource">—</strong></div>
+            <div><span>Loja</span><strong id="metaStore">—</strong></div>
+            <div><span>Período</span><strong id="metaPeriod">—</strong></div>
+            <div><span>Turnos reconhecidos</span><strong id="metaTurns">—</strong></div>
+            <div><span>Marcações no espelho</span><strong id="metaPointMarks">—</strong></div>
+            <div><span>Cobertura analisada</span><strong id="metaCoverage">—</strong></div>
+          </div>
+        </div>
+
+        <div class="diagnostic-section">
+          <h3>Leitura rápida das causas</h3>
+          <div id="causeSummary" class="cause-summary"><p>Aguardando o cálculo.</p></div>
+        </div>
+
+        <div class="diagnostic-section">
+          <h3>Cargos com mais ocorrências</h3>
+          <div id="cargoSummary" class="cargo-summary"><p>Aguardando o cálculo.</p></div>
+        </div>
+      </aside>
     </section>
 
     <details class="card rules">
@@ -72,7 +107,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="guard.js"></script>
   <script src="app.js"></script>
 </body>
