@@ -8,14 +8,13 @@ function check(){const missing=REQUIRED.filter(([k])=>!window[k]);const optional
 function loadBatch(){if(document.querySelector('script[data-aderencia-batch]'))return;const s=document.createElement('script');s.src='batch.js';s.dataset.aderenciaBatch='1';s.defer=true;document.head.appendChild(s)}
 window.addEventListener('error',e=>console.error('Erro global da aplicação:',e.error||e.message));
 check();
-const badge=document.querySelector('.privacy');if(badge)badge.textContent='Processamento local no navegador • v1.0 RC24';
+const badge=document.querySelector('.privacy');if(badge)badge.textContent='Processamento local no navegador • v1.0 RC25';
 /* Adaptadores registram suas regras antes do engine-v3.js. */
 document.write('<script src="point-semantics.js"><\/script>');
 document.write('<script src="pdf-xlsx-compat-rc21.js"><\/script>');
-document.write('<script src="pdf-schedule-parser-rc24.js"><\/script>');
-/* RC24 ancora cada coluna PDF diretamente ao período real do espelho; RC22 permanece carregado apenas por compatibilidade e não atua sobre RC24. */
-document.write('<script src="pdf-operational-competence-rc22.js"><\/script>');
-/* pdf-period-corrector.js foi removido do pipeline: conflitava com a competência operacional 11→10. */
+document.write('<script src="pdf-schedule-parser-rc25.js"><\/script>');
+/* RC25 resolve o calendário pelo período do espelho + dias da semana impressos no PDF. */
+/* RC22 não é mais necessário no pipeline novo; o RC25 já gera datas finais utilizáveis. */
 document.write('<script src="monitor-export.js"><\/script>');
 document.write('<script src="divergence-dashboard.js"><\/script>');
 document.write('<script src="divergence-capture-rc20.js"><\/script>');
