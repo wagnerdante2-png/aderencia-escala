@@ -8,10 +8,12 @@ function check(){const missing=REQUIRED.filter(([k])=>!window[k]);const optional
 function loadBatch(){if(document.querySelector('script[data-aderencia-batch]'))return;const s=document.createElement('script');s.src='batch.js';s.dataset.aderenciaBatch='1';s.defer=true;document.head.appendChild(s)}
 window.addEventListener('error',e=>console.error('Erro global da aplicação:',e.error||e.message));
 check();
-const badge=document.querySelector('.privacy');if(badge)badge.textContent='Processamento local no navegador • v1.0 RC26';
+const badge=document.querySelector('.privacy');if(badge)badge.textContent='Processamento local no navegador • v1.0 RC27';
 /* Adaptadores registram suas regras antes do engine-v3.js. */
 document.write('<script src="point-semantics.js"><\/script>');
 document.write('<script src="pdf-xlsx-compat-rc21.js"><\/script>');
+/* RC27 desliga OCR automático em PDFs exportados do Excel: a camada textual deve ser usada como fonte primária e erros precisam aparecer rapidamente. */
+document.write('<script src="pdf-ocr-guard-rc27.js"><\/script>');
 document.write('<script src="pdf-schedule-parser-rc26.js"><\/script>');
 /* RC26 deriva a competência pela própria grade exportada do Excel: mês impresso + dias + dias da semana. */
 /* O período do espelho serve apenas para calcular a interseção válida; nunca mais para deslocar artificialmente o PDF. */
