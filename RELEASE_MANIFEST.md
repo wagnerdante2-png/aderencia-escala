@@ -12,6 +12,7 @@ Este arquivo identifica o conjunto ativo que deve ser considerado para empacotam
 - `store-management.js`
 - `canonical-validation-rc35.js`
 - `pdf-security-rc35.js`
+- `ui-final-rc35.js`
 - `engine-v3.js`
 - `history.js`
 - `history-report.js`
@@ -42,7 +43,7 @@ Ao gerar uma distribuição limpa, use somente os arquivos essenciais acima.
 - Histórico, divergências persistidas, divergências pendentes, configuração administrativa e cadastro de lojas/regionais são gravados na base portátil.
 - A gravação é serializada e debounced para evitar múltiplas escritas concorrentes.
 - Ao zerar o histórico, os detalhes e pendências de divergência também são zerados.
-- A vinculação de uma base substitui dados locais antigos, evitando mistura silenciosa entre computadores.
+- A vinculação de uma base substitui os dados persistentes carregados da base escolhida e evita mistura silenciosa de histórico/divergências.
 - Bases criadas por versão futura incompatível são recusadas.
 
 ## Diagnóstico estrutural RC35
@@ -56,6 +57,13 @@ Ao gerar uma distribuição limpa, use somente os arquivos essenciais acima.
 ## Segurança de PDF
 
 - O adaptador `pdf-security-rc35.js` força `isEvalSupported=false` no PDF.js sem alterar a API usada pelos módulos existentes.
+
+## Rede dinâmica
+
+- Novas lojas são cadastradas pela interface e vinculadas a uma regional.
+- Histórico, Monitoramento e Semestral aceitam filtro regional.
+- Textos e contadores de rede são atualizados a partir das lojas cadastradas e não dependem de quantidade fixa de unidades.
+- O padrão atual de código operacional permanece `ML00` (duas casas numéricas), compatível com a rede atual e próximas inaugurações.
 
 ## Dependências externas
 
@@ -91,3 +99,8 @@ Antes de promover RC35 para versão final:
 17. Abrir `Diagnóstico da leitura` em Excel homologado e verificar datas, funcionários e códigos.
 18. Repetir o diagnóstico após um PDF ser convertido para XLSX sintético e comparar a matriz com o documento original.
 19. Confirmar que o percentual de aderência permanece idêntico ao da RC33 nos casos já homologados.
+20. Confirmar que o Monitoramento mostra a quantidade atual de lojas cadastradas, inclusive após adicionar uma nova unidade.
+
+## Critério de congelamento
+
+Se os 20 testes acima passarem, a RC35 deve ser congelada e empacotada sem novas alterações funcionais. Mudanças posteriores devem seguir nova versão para evitar regressões no motor homologado.
