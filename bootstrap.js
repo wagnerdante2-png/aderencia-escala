@@ -1,41 +1,13 @@
 (function(){
 'use strict';
-window.ADERENCIA_VERSION='v1.0 RC44';
+window.ADERENCIA_VERSION='v1.0 RC45';
 const REQUIRED=[['pdfjsLib','leitor de PDF'],['XLSX','leitor de Excel']];
 const OPTIONAL=[['jspdf','gerador de relatórios PDF'],['Tesseract','OCR de PDF imagem']];
 function setStatus(id,text){const e=document.getElementById(id);if(!e)return;e.textContent=text;e.classList.remove('muted','ok');e.classList.add('error')}
 function storageOK(){try{const k='__aderencia_health__';localStorage.setItem(k,'1');localStorage.removeItem(k);return true}catch{return false}}
 function check(){const missing=REQUIRED.filter(([k])=>!window[k]);const optional=OPTIONAL.filter(([k])=>!window[k]);window.ADERENCIA_HEALTH={ok:!missing.length&&storageOK(),missing:missing.map(x=>x[1]),optionalMissing:optional.map(x=>x[1]),storage:storageOK(),checkedAt:new Date().toISOString()};if(missing.length){const msg=`Não foi possível carregar ${missing.map(x=>x[1]).join(' e ')}. Este pacote usa bibliotecas online; verifique a conexão e reabra o index.html.`;setStatus('pointStatus',msg);setStatus('scheduleStatus',msg);document.getElementById('calculateBtn')?.setAttribute('disabled','disabled');alert(msg)}else if(!window.ADERENCIA_HEALTH.storage){alert('O navegador bloqueou o armazenamento local. A análise funcionará, mas o histórico não poderá ser salvo.')}else if(optional.length){console.warn('Recursos opcionais indisponíveis:',optional.map(x=>x[1]).join(', '))}}
 function loadBatch(){if(document.querySelector('script[data-aderencia-batch]'))return;const s=document.createElement('script');s.src='batch.js';s.dataset.aderenciaBatch='1';s.defer=true;document.head.appendChild(s)}
-window.addEventListener('error',e=>console.error('Erro global da aplicação:',e.error||e.message));
-check();
-const badge=document.querySelector('.privacy');if(badge)badge.textContent=`Processamento local no navegador • ${window.ADERENCIA_VERSION}`;
-document.write('<script src="portable-storage.js"><\/script>');
-document.write('<script src="pdf-security-rc35.js"><\/script>');
-document.write('<script src="point-semantics.js"><\/script>');
-document.write('<script src="pdf-xlsx-compat-rc21.js"><\/script>');
-document.write('<script src="pdf-ocr-guard-rc27.js"><\/script>');
-document.write('<script src="pdf-calendar-integrity-rc29.js"><\/script>');
-document.write('<script src="canonical-validation-rc35.js"><\/script>');
-document.write('<script src="pdf-schedule-parser-rc28.js"><\/script>');
-document.write('<script src="monitor-export.js"><\/script>');
-document.write('<script src="divergence-dashboard-rc44.js"><\/script>');
-document.write('<script src="divergence-capture-rc20.js"><\/script>');
-document.write('<script src="divergence-help-rc42.js"><\/script>');
-document.write('<script src="layout-fixes-rc19.js"><\/script>');
-document.write('<script src="store-management.js"><\/script>');
-document.write('<script src="ui-final-rc35.js"><\/script>');
-document.write('<script src="network-led-panel-rc36.js"><\/script>');
-document.write('<script src="competence-integrity-rc38.js"><\/script>');
-document.write('<script src="region-view-integrity-rc38.js"><\/script>');
-document.write('<script src="period-controller-rc39.js"><\/script>');
-document.write('<script src="period-render-coherence-rc44.js"><\/script>');
-document.write('<script src="evolution-dashboard-rc39.js"><\/script>');
-document.write('<script src="performance-rc42.js"><\/script>');
-document.write('<script src="divergence-audit-rc42.js"><\/script>');
-document.write('<script src="recurrence-dashboard-rc44.js"><\/script>');
-document.write('<script src="navigation-integrity-rc44.js"><\/script>');
-document.write('<script src="rc44-integrity-check.js"><\/script>');
-document.addEventListener('DOMContentLoaded',()=>{const r=window.ADERENCIA_STORE_REGISTRY;if(r)r.importRegistry(r.load())});
-loadBatch();
+window.addEventListener('error',e=>console.error('Erro global da aplicação:',e.error||e.message));check();const badge=document.querySelector('.privacy');if(badge)badge.textContent=`Processamento local no navegador • ${window.ADERENCIA_VERSION}`;
+['portable-storage.js','pdf-security-rc35.js','point-semantics.js','pdf-xlsx-compat-rc21.js','pdf-ocr-guard-rc27.js','pdf-calendar-integrity-rc29.js','canonical-validation-rc35.js','pdf-schedule-parser-rc28.js','monitor-export.js','divergence-dashboard-rc44.js','divergence-capture-rc20.js','divergence-pdf-bridge-rc45.js','divergence-help-rc42.js','layout-fixes-rc19.js','store-management.js','ui-final-rc35.js','network-led-panel-rc36.js','competence-integrity-rc38.js','region-view-integrity-rc38.js','period-controller-rc39.js','period-render-coherence-rc44.js','evolution-dashboard-rc39.js','performance-rc42.js','divergence-audit-rc42.js','recurrence-dashboard-rc44.js','navigation-integrity-rc44.js','rc44-integrity-check.js'].forEach(src=>document.write(`<script src="${src}"><\/script>`));
+document.addEventListener('DOMContentLoaded',()=>{const r=window.ADERENCIA_STORE_REGISTRY;if(r)r.importRegistry(r.load())});loadBatch();
 })();
