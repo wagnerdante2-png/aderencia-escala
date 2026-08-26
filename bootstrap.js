@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-window.ADERENCIA_VERSION='v1.0 RC38';
+window.ADERENCIA_VERSION='v1.0 RC39';
 const REQUIRED=[['pdfjsLib','leitor de PDF'],['XLSX','leitor de Excel']];
 const OPTIONAL=[['jspdf','gerador de relatórios PDF'],['Tesseract','OCR de PDF imagem']];
 function setStatus(id,text){const e=document.getElementById(id);if(!e)return;e.textContent=text;e.classList.remove('muted','ok');e.classList.add('error')}
@@ -27,6 +27,8 @@ document.write('<script src="ui-final-rc35.js"><\/script>');
 document.write('<script src="network-led-panel-rc36.js"><\/script>');
 document.write('<script src="competence-integrity-rc38.js"><\/script>');
 document.write('<script src="region-view-integrity-rc38.js"><\/script>');
+document.write('<script src="period-controller-rc39.js"><\/script>');
+document.write('<script src="evolution-dashboard-rc39.js"><\/script>');
 document.write('<script src="rc38-integrity-check.js"><\/script>');
 document.addEventListener('DOMContentLoaded',()=>{const r=window.ADERENCIA_STORE_REGISTRY;if(r)r.importRegistry(r.load())});
 loadBatch();
