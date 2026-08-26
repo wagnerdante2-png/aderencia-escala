@@ -8,7 +8,7 @@ function check(){const missing=REQUIRED.filter(([k])=>!window[k]);const optional
 function loadBatch(){if(document.querySelector('script[data-aderencia-batch]'))return;const s=document.createElement('script');s.src='batch.js';s.dataset.aderenciaBatch='1';s.defer=true;document.head.appendChild(s)}
 window.addEventListener('error',e=>console.error('Erro global da aplicação:',e.error||e.message));
 check();
-const badge=document.querySelector('.privacy');if(badge)badge.textContent='Processamento local no navegador • v1.0 RC37';
+const badge=document.querySelector('.privacy');if(badge)badge.textContent='Processamento local no navegador • v1.0 RC38';
 document.write('<script src="portable-storage.js"><\/script>');
 document.write('<script src="pdf-security-rc35.js"><\/script>');
 document.write('<script src="point-semantics.js"><\/script>');
@@ -25,6 +25,7 @@ document.write('<script src="store-management.js"><\/script>');
 document.write('<script src="ui-final-rc35.js"><\/script>');
 document.write('<script src="network-led-panel-rc36.js"><\/script>');
 document.write('<script src="competence-cycle-rc37.js"><\/script>');
+document.write('<script src="competence-integrity-rc38.js"><\/script>');
 document.addEventListener('DOMContentLoaded',()=>{const r=window.ADERENCIA_STORE_REGISTRY;if(r)r.importRegistry(r.load())});
 loadBatch();
 })();
