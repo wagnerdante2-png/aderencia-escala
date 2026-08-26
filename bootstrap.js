@@ -10,6 +10,7 @@ window.addEventListener('error',e=>console.error('Erro global da aplicação:',e
 check();
 const badge=document.querySelector('.privacy');if(badge)badge.textContent='Processamento local no navegador • v1.0 RC35';
 document.write('<script src="portable-storage.js"><\/script>');
+document.write('<script src="pdf-security-rc35.js"><\/script>');
 document.write('<script src="point-semantics.js"><\/script>');
 document.write('<script src="pdf-xlsx-compat-rc21.js"><\/script>');
 document.write('<script src="pdf-ocr-guard-rc27.js"><\/script>');
