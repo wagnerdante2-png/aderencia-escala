@@ -1,0 +1,45 @@
+(function(){
+'use strict';
+if(window.__ADERENCIA_COMPETENCE_INTEGRITY_RC38__)return;
+window.__ADERENCIA_COMPETENCE_INTEGRITY_RC38__=true;
+const HISTORY_KEY='aderenciaHistoricoV2';
+const DETAIL_KEYS=['aderenciaDivergenciasV1','aderenciaDivergenciasPendentesV1','aderenciaDivergenciasV2','aderenciaDivergencias'];
+const $=id=>document.getElementById(id);
+const brToIso=s=>{const m=String(s||'').match(/(\d{2})\/(\d{2})\/(\d{4})/);return m?`${m[3]}-${m[2]}-${m[1]}`:null};
+const isoCompetence=s=>{const m=String(s||'').match(/^(20\d{2})-(\d{2})-(\d{2})$/);return m?{month:+m[2],year:+m[1]}:null};
+const pctNum=s=>{const m=String(s||'').match(/-?\d+(?:[.,]\d+)?/);return m?Number(m[0].replace(',','.')):null};
+function datesFromText(text){return[...String(text||'').matchAll(/(\d{2}\/\d{2}\/\d{4})/g)].map(m=>brToIso(m[1])).filter(Boolean)}
+function analysisPointPeriod(){
+  const warnings=$('warnings')?.textContent||'';
+  const full=warnings.match(/per[ií]odo\s+integral\s+do\s+espelho\s+[ée]\s+(\d{2}\/\d{2}\/\d{4})\s+a\s+(\d{2}\/\d{2}\/\d{4})/i);
+  if(full)return{start:brToIso(full[1]),end:brToIso(full[2]),source:'espelho-integral'};
+  const d=datesFromText($('metaPeriod')?.textContent||'');
+  return d.length?{start:d[0],end:d[d.length-1],source:'periodo-exibido'}:null;
+}
+function competenceFromPointPeriod(){const p=analysisPointPeriod(),c=p&&isoCompetence(p.start);return c?{...c,periodStart:p.start,periodEnd:p.end,source:p.source}:null}
+function setSelect(id,value,dispatch=false){const e=$(id);if(!e||value==null)return;const v=String(value);if(![...e.options].some(o=>o.value===v))e.add(new Option(v,v));if(e.value!==v){e.value=v;if(dispatch)e.dispatchEvent(new Event('change',{bubbles:true}))}}
+function syncAll(c,store){if(!c)return;setSelect('saveMonth',c.month);setSelect('saveYear',c.year);setSelect('historyMonth',c.month,true);setSelect('historyYear',c.year,true);if(store)setSelect('historyStore',store,true);setSelect('monitorMonth',c.month,true);setSelect('monitorYear',c.year,true);setSelect('networkLedMonth',c.month,true);setSelect('networkLedYear',c.year,true);setSelect('semesterYear',c.year,true)}
+function rawArray(key){try{const x=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(x)?x:[]}catch{return[]}}
+function writeArray(key,rows){localStorage.setItem(key,JSON.stringify(rows))}
+function dedupeHistory(rows){const map=new Map();for(const r of rows){if(!r||!r.store||!Number.isFinite(+r.adherence))continue;const k=`${r.store}-${r.year}-${r.month}`,p=map.get(k);if(!p||String(r.savedAt||'')>=String(p.savedAt||''))map.set(k,r)}return[...map.values()].sort((a,b)=>(+a.year)-(+b.year)||(+a.month)-(+b.month)||String(a.store).localeCompare(String(b.store)))}
+function canonicalizeDetails(){let changed=false;for(const key of DETAIL_KEYS){const rows=rawArray(key);if(!rows.length)continue;let local=false;for(const r of rows){const c=isoCompetence(r?.periodStart);if(c&&(r.month!==c.month||r.year!==c.year)){r.month=c.month;r.year=c.year;r.competenceRule='POINT_PERIOD_START';local=true;changed=true}}if(local)writeArray(key,rows)}return changed}
+function detailEvidence(){const all=[];for(const key of DETAIL_KEYS)all.push(...rawArray(key));return all.filter(r=>r&&r.store&&r.periodStart)}
+function repairHistoryFromEvidence(){const rows=rawArray(HISTORY_KEY);if(!rows.length)return false;const details=detailEvidence();let changed=false;for(const r of rows){let start=r.periodStart||null;if(!start){const cand=details.filter(d=>d.store===r.store&&((+d.month===+r.month&&+d.year===+r.year)||(Number.isFinite(+d.adherence)&&Math.abs(+d.adherence-(+r.adherence))<0.011))).sort((a,b)=>String(b.capturedAt||'').localeCompare(String(a.capturedAt||'')))[0];start=cand?.periodStart||null}const c=isoCompetence(start);if(c&&(r.month!==c.month||r.year!==c.year)){r.month=c.month;r.year=c.year;r.competenceRule='POINT_PERIOD_START';changed=true}}if(changed){writeArray(HISTORY_KEY,dedupeHistory(rows));window.ADERENCIA_HISTORY?.notify?.()}return changed}
+function repairCurrentSave(){const c=competenceFromPointPeriod();if(!c)return;const store=(String($('resultStore')?.textContent||$('metaStore')?.textContent||'').match(/ML\d{2}/)||[])[0];const adherence=pctNum($('resultPercent')?.textContent);if(!store||adherence==null)return;const rows=rawArray(HISTORY_KEY),now=Date.now();let idx=-1,best=-Infinity;rows.forEach((r,i)=>{if(r.store!==store||Math.abs((+r.adherence)-adherence)>.011)return;const t=Date.parse(r.savedAt||'')||0;if(t>best&&(!t||Math.abs(now-t)<30000)){best=t;idx=i}});if(idx<0)return;rows[idx]={...rows[idx],month:c.month,year:c.year,periodStart:c.periodStart,periodEnd:c.periodEnd,competenceRule:'POINT_PERIOD_START'};writeArray(HISTORY_KEY,dedupeHistory(rows));syncAll(c,store);window.ADERENCIA_HISTORY?.notify?.();window.dispatchEvent(new CustomEvent('aderencia:competencecorrected',{detail:{store,...c}}))}
+async function parsePointPeriod(file){if(!file||!window.pdfjsLib)return null;const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;for(let p=1;p<=Math.min(pdf.numPages,3);p++){const page=await pdf.getPage(p),tc=await page.getTextContent(),text=tc.items.map(i=>i.str||'').join(' '),m=text.match(/Espelho\s+do\s+Ponto\s+(\d{2}\/\d{2}\/\d{4})\s*-\s*(\d{2}\/\d{2}\/\d{4})/i);if(m)return{start:brToIso(m[1]),end:brToIso(m[2])}}return null}
+async function saveBatchCanonical(){const cards=[...document.querySelectorAll('.batch-row.ok')];if(!cards.length)return alert('Não há resultados válidos para salvar.');const H=window.ADERENCIA_HISTORY;if(!H)return alert('Histórico indisponível.');const hist=H.load(),fail=[];let saved=0,updated=0;for(const card of cards){try{const point=card.querySelector('input[data-kind="point"]')?.files?.[0],result=card.querySelector('.batch-status strong')?.textContent||'',store=(result.match(/ML\d{2}/)||[])[0],adherence=pctNum(result),period=await parsePointPeriod(point),c=period&&isoCompetence(period.start);if(!store||adherence==null||!c)throw new Error('loja, aderência ou período do espelho não identificado');const idx=hist.findIndex(r=>r.store===store&&+r.month===c.month&&+r.year===c.year),prev=idx>=0?hist[idx]:null,row={store,month:c.month,year:c.year,adherence:+adherence.toFixed(2),bonus:prev?.bonus||false,bonusAt:prev?.bonusAt||null,savedAt:new Date().toISOString(),periodStart:period.start,periodEnd:period.end,competenceRule:'POINT_PERIOD_START'};if(idx>=0){hist[idx]=row;updated++}else{hist.push(row);saved++}}catch(err){fail.push(err.message)}}H.saveAll(hist);H.notify();repairHistoryFromEvidence();alert(`${saved} resultado(s) salvo(s) e ${updated} atualizado(s) na competência do início do espelho.${fail.length?` ${fail.length} linha(s) não foram salvas: ${fail.join('; ')}`:''}`)}
+function install(){
+  canonicalizeDetails();repairHistoryFromEvidence();
+  const label=document.querySelector('.competence-save span');if(label)label.textContent='Competência operacional (início do espelho)';
+  const meta=$('metaPeriod');if(meta)new MutationObserver(()=>{const c=competenceFromPointPeriod();if(c){setSelect('saveMonth',c.month);setSelect('saveYear',c.year)}}).observe(meta,{childList:true,subtree:true,characterData:true});
+  document.addEventListener('click',e=>{
+    if(e.target?.id==='saveHistoryBtn')setTimeout(repairCurrentSave,25);
+    if(e.target?.id==='batchSaveBtn'){e.preventDefault();e.stopImmediatePropagation();saveBatchCanonical().catch(err=>alert(`Falha ao salvar lote: ${err.message}`))}
+  },true);
+  window.addEventListener('aderencia:detailcaptured',()=>{setTimeout(()=>{canonicalizeDetails();repairHistoryFromEvidence()},0)});
+  window.addEventListener('aderencia:historychange',()=>setTimeout(repairHistoryFromEvidence,0));
+  const c=competenceFromPointPeriod();if(c){setSelect('saveMonth',c.month);setSelect('saveYear',c.year)}
+}
+window.ADERENCIA_COMPETENCE={analysisPointPeriod,fromAnalysis:competenceFromPointPeriod,repair:()=>{canonicalizeDetails();return repairHistoryFromEvidence()}};
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
+})();
