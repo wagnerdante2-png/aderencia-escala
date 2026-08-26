@@ -20,13 +20,27 @@ O processamento acontece no próprio navegador. Os arquivos selecionados não s�
 - fórmula: `1 - (desvios + 10 × não conformidades) / total de marcações consideradas`;
 - o resultado visual é limitado entre 0% e 100%.
 
-O sistema também valida loja/período, normaliza nomes, sinaliza colaboradores não conciliados e bloqueia PDF de escala cujo calendário impresso seja incompatível com a competência do espelho.
+O sistema também valida loja/período, normaliza nomes, sinaliza colaboradores não conciliados e bloqueia combinações sem qualquer interseção de datas.
+
+## Competência operacional RC38
+
+A competência mensal é definida pelo **início do período integral do espelho de ponto**.
+
+- `11/06/2026 a 10/07/2026` = **Junho/2026**;
+- `11/07/2026 a 10/08/2026` = **Julho/2026**;
+- `11/12/2026 a 10/01/2027` = **Dezembro/2026**.
+
+A data final da escala ou a data final da interseção não define a competência.
+
+Se a escala cobrir somente parte do ciclo do espelho, inclusive casos como `01–30` ou `01–31`, o cálculo é feito proporcionalmente somente nos dias existentes na interseção. O resultado não é rejeitado apenas porque a escala não cobre todos os dias do espelho.
+
+Essa mesma competência é usada em Histórico, painel LED, Monitoramento, Semestral, Divergências, processamento em lote e exportações.
 
 ## Estruturas reconhecidas
 
 ### Espelho de ponto
 
-Procura os metadados `Espelho do Ponto`, `Matrícula`, `Nome`, `Departamento / ML`, as linhas diárias e as marcações reais `O` ou `I`.
+Procura os metadados `Espelho do Ponto`, `Matrícula`, `Nome`, `Departamento / ML`, as linhas diárias e as marcações efetivas `O` ou `I`. Marcações `P` são filtradas pela camada semântica e não compõem a batida real.
 
 ### Escala Excel/XLSM
 
@@ -34,13 +48,15 @@ Procura os metadados `Espelho do Ponto`, `Matrícula`, `Nome`, `Departamento / M
 
 ### Escala PDF
 
-É uma contingência. O sistema reconstrói a matriz visual Nome × Dias por posição dos elementos do PDF, associa cada célula ao período do espelho e valida o calendário impresso antes do cálculo. Se o PDF aparentar pertencer a outro ciclo, o cálculo é bloqueado para evitar aderência falsa.
+É uma contingência. O sistema reconstrói a matriz visual Nome × Dias por posição dos elementos do PDF, associa cada célula às datas reconhecidas e usa OCR como fallback quando o texto estrutural não é suficiente. Quando somente parte do ciclo do espelho estiver presente, a análise considera a interseção disponível.
 
 ## Diagnóstico estrutural
 
-A RC36 preserva a camada paralela de inspeção da RC35. Ela não altera a fórmula de aderência e produz uma representação canônica `Funcionário × Data × Código`, mede continuidade temporal, cobertura da matriz, quantidade de colaboradores e células não classificadas e disponibiliza o botão **Diagnóstico da leitura** para visualizar como a escala foi interpretada.
+A RC38 preserva a camada paralela de inspeção introduzida nas RC35/RC36. Ela não altera a fórmula de aderência e produz uma representação canônica `Funcionário × Data × Código`, mede continuidade temporal, cobertura da matriz, quantidade de colaboradores e células não classificadas e disponibiliza o botão **Diagnóstico da leitura** para visualizar como a escala foi interpretada.
 
 Esse diagnóstico funciona tanto com Excel/XLSM/XLS quanto com o XLSX sintético produzido quando uma escala PDF é interpretada.
+
+A RC38 adiciona ainda uma verificação não destrutiva de integridade no carregamento. Em operação normal, `ADERENCIA_RC38_HEALTH.ok` deve permanecer `true` no console do navegador.
 
 ## Histórico, lojas, regionais e base portátil
 
@@ -62,7 +78,7 @@ Esse diagnóstico funciona tanto com Excel/XLSM/XLS quanto com o XLSX sintético
 
 ## Mini painel LED da rede
 
-A RC36 adiciona um painel compacto de leitura rápida logo abaixo da navegação principal. Ele mostra, para a competência selecionada:
+O painel compacto de leitura rápida mostra, para a competência selecionada:
 
 - média de aderência da rede;
 - quantidade de lojas verdes (≥95%);
@@ -71,7 +87,7 @@ A RC36 adiciona um painel compacto de leitura rápida logo abaixo da navegação
 - quantidade de lojas sem resultado;
 - cobertura da rede no mês.
 
-O painel inicia no mês/ano atual e pode ser alterado dinamicamente. Ao mudar a competência no painel LED, o filtro mensal do Monitoramento é sincronizado; ao mudar o mês/ano no Monitoramento, o painel LED acompanha a alteração.
+Ao mudar a competência no painel LED, o filtro mensal do Monitoramento é sincronizado; ao mudar o mês/ano no Monitoramento, o painel LED acompanha a alteração.
 
 A base portátil utiliza a File System Access API disponível em navegadores Chromium compatíveis, como Edge e Chrome atualizados. Por segurança do navegador, a primeira criação/vinculação e eventual renovação de permissão exigem ação do usuário.
 
@@ -83,7 +99,13 @@ Quando o histórico é efetivamente zerado, os detalhes de divergências vincula
 
 ## Processamento em lote
 
-A aba de lote reutiliza o mesmo motor da análise individual. Cada par de arquivos é processado sequencialmente. Erros de leitura, loja, período ou calendário incompatível interrompem apenas aquela linha e são exibidos diretamente no lote.
+A aba de lote reutiliza o mesmo motor da análise individual. Cada par de arquivos é processado sequencialmente. Erros de leitura, loja ou período interrompem apenas aquela linha e são exibidos diretamente no lote.
+
+O salvamento em lote usa a mesma regra RC38: a competência vem do início do período integral do espelho de cada linha.
+
+## Divergências por colaborador
+
+O detalhamento persiste apenas ocorrências que reduziram efetivamente o score e confere os totais contra o motor principal antes de gravar. A competência do detalhamento também usa o início do período integral do espelho, mesmo em análises proporcionais por interseção.
 
 ## Segurança de PDF
 
@@ -103,4 +125,4 @@ Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
 
 ## Versão
 
-Pré-release operacional: **v1.0 RC36**.
+Pré-release operacional: **v1.0 RC38**.
