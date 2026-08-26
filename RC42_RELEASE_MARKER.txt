@@ -1,0 +1,2 @@
+Aderência de Escala v1.0 RC42
+Candidate de teste com auditoria de divergências e otimizações de desempenho.
