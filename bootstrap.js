@@ -29,6 +29,7 @@ document.write('<script src="network-led-panel-rc36.js"><\/script>');
 document.write('<script src="competence-integrity-rc38.js"><\/script>');
 document.write('<script src="region-view-integrity-rc38.js"><\/script>');
 document.write('<script src="period-controller-rc39.js"><\/script>');
+document.write('<script src="period-render-coherence-rc44.js"><\/script>');
 document.write('<script src="evolution-dashboard-rc39.js"><\/script>');
 document.write('<script src="performance-rc42.js"><\/script>');
 document.write('<script src="divergence-audit-rc42.js"><\/script>');
