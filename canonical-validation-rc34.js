@@ -1,51 +1,85 @@
 (function(){
 'use strict';
-/* RC34 — camada paralela de diagnóstico. Não altera parser, cálculo ou arquivo selecionado. */
-const VERSION='RC34';
+/* RC35 — modelo canônico + diagnóstico paralelo. NÃO altera parser, cálculo ou arquivo selecionado. */
+const VERSION='RC35';
 const CODE_RE=/^(?:T\s*\d{1,2}|F|FER|AF|AB|AL|FF|FC|NC|AE|D)$/i;
 const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
-const isDate=v=>v instanceof Date&&!isNaN(v)||typeof v==='number'&&v>20000&&v<100000||/^\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}$/.test(String(v||'').trim());
+const code=v=>norm(v).replace(/^T\s+(\d{1,2})$/,'T$1');
+const pad=n=>String(n).padStart(2,'0');
+function excelSerialToDate(v){if(typeof v!=='number'||v<20000||v>100000)return null;const ms=Math.round((v-25569)*86400*1000);const d=new Date(ms);return isNaN(d)?null:d}
+function parseDate(v){
+ if(v instanceof Date&&!isNaN(v))return new Date(v.getFullYear(),v.getMonth(),v.getDate(),12);
+ const s=String(v??'').trim();let m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);if(m){let y=+m[3];if(y<100)y+=2000;const d=new Date(y,+m[2]-1,+m[1],12);return d.getDate()===+m[1]&&d.getMonth()===+m[2]-1?d:null}
+ const x=excelSerialToDate(v);return x?new Date(x.getFullYear(),x.getMonth(),x.getDate(),12):null;
+}
+const iso=d=>d?`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`:null;
+const br=d=>d?`${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`:'—';
+function contiguousScore(dates){if(dates.length<2)return dates.length?1:0;let ok=0;for(let i=1;i<dates.length;i++){const diff=Math.round((dates[i]-dates[i-1])/86400000);if(diff===1)ok++}return ok/(dates.length-1)}
+function findNameCargoColumns(data,header,dateCols){let nameCol=0,cargoCol=1;for(let r=Math.max(0,header-4);r<=header;r++){(data[r]||[]).forEach((v,c)=>{const n=norm(v);if(/^(NOME|FUNCIONARIO|COLABORADOR)$/.test(n))nameCol=c;if(/^CARGO$|^FUNCAO$/.test(n))cargoCol=c})}const firstDate=Math.min(...dateCols);if(nameCol>=firstDate)nameCol=0;if(cargoCol>=firstDate)cargoCol=Math.min(1,firstDate-1);return{nameCol,cargoCol}}
 function inspectWorkbook(wb,fileName){
- const report={version:VERSION,file:fileName||'',ok:false,sheet:null,rows:0,dateColumns:0,employees:0,codeCells:0,coverage:0,warnings:[],checkedAt:new Date().toISOString()};
+ const report={version:VERSION,file:fileName||'',ok:false,score:0,sheet:null,rows:0,dateColumns:0,employees:0,codeCells:0,expectedCells:0,coverage:0,dateContinuity:0,duplicateDates:0,invalidDateColumns:0,unknownCells:0,warnings:[],checkedAt:new Date().toISOString(),canonical:null};
  const candidates=[];
  for(const name of wb.SheetNames||[]){
   const ws=wb.Sheets[name],data=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
-  for(let r=0;r<Math.min(data.length,35);r++){
+  for(let r=0;r<Math.min(data.length,45);r++){
    const row=data[r]||[],dateCols=[];
-   row.forEach((v,c)=>{if(isDate(v))dateCols.push(c)});
+   row.forEach((v,c)=>{if(parseDate(v))dateCols.push(c)});
    if(dateCols.length>=20)candidates.push({name,data,header:r,dateCols});
   }
  }
- candidates.sort((a,b)=>b.dateCols.length-a.dateCols.length);
+ candidates.sort((a,b)=>b.dateCols.length-a.dateCols.length||a.header-b.header);
  const c=candidates[0];
  if(!c){report.warnings.push('Nenhuma grade com pelo menos 20 colunas de data foi encontrada.');return report}
- report.sheet=c.name;report.dateColumns=c.dateCols.length;report.rows=c.data.length;
- let expected=0,filled=0;
+ report.sheet=c.name;report.rows=c.data.length;
+ const parsedDates=c.dateCols.map(i=>({col:i,date:parseDate(c.data[c.header][i])})).filter(x=>x.date).sort((a,b)=>a.col-b.col);
+ const seen=new Set();for(const x of parsedDates){const k=iso(x.date);if(seen.has(k))report.duplicateDates++;seen.add(k)}
+ report.dateColumns=parsedDates.length;report.dateContinuity=contiguousScore(parsedDates.map(x=>x.date));report.invalidDateColumns=c.dateCols.length-parsedDates.length;
+ const {nameCol,cargoCol}=findNameCargoColumns(c.data,c.header,c.dateCols),employees=[];
+ let expected=0,filled=0,unknown=0;
  for(let r=c.header+1;r<c.data.length;r++){
-  const row=c.data[r]||[],vals=c.dateCols.map(i=>norm(row[i])).filter(v=>CODE_RE.test(v));
-  if(vals.length<Math.max(8,Math.floor(c.dateCols.length*.35)))continue;
-  report.employees++;report.codeCells+=vals.length;expected+=c.dateCols.length;filled+=vals.length;
+  const row=c.data[r]||[],rawVals=parsedDates.map(x=>row[x.col]),vals=rawVals.map(code),recognized=vals.filter(v=>CODE_RE.test(v));
+  if(recognized.length<Math.max(8,Math.floor(parsedDates.length*.35)))continue;
+  const name=String(row[nameCol]||'').trim(),cargo=String(row[cargoCol]||'').trim();if(!name||norm(name)==='NOME')continue;
+  const cells={};for(let i=0;i<parsedDates.length;i++){const v=vals[i];if(CODE_RE.test(v)){cells[iso(parsedDates[i].date)]=v;filled++}else if(String(rawVals[i]??'').trim()){unknown++}}
+  expected+=parsedDates.length;employees.push({name,cargo,cells,filled:Object.keys(cells).length,total:parsedDates.length});
  }
- report.coverage=expected?filled/expected:0;
+ report.employees=employees.length;report.codeCells=filled;report.expectedCells=expected;report.coverage=expected?filled/expected:0;report.unknownCells=unknown;
+ const dateScore=Math.min(1,parsedDates.length/30)*.22+report.dateContinuity*.18+(report.duplicateDates?0:.05);
+ const employeeScore=Math.min(1,employees.length/8)*.15;
+ const coverageScore=Math.min(1,report.coverage/.95)*.35;
+ const unknownPenalty=Math.min(.15,expected?unknown/expected:.15);
+ report.score=Math.max(0,Math.min(100,Math.round((dateScore+employeeScore+coverageScore-unknownPenalty)*100)));
  if(report.dateColumns<28)report.warnings.push(`Grade contém apenas ${report.dateColumns} colunas de data.`);
+ if(report.dateContinuity<.95)report.warnings.push(`Sequência temporal não é totalmente contínua (${Math.round(report.dateContinuity*100)}%).`);
+ if(report.duplicateDates)report.warnings.push(`${report.duplicateDates} data(s) duplicada(s) na grade.`);
  if(report.employees<3)report.warnings.push(`Somente ${report.employees} colaboradores reconhecidos na matriz.`);
  if(report.coverage<.75)report.warnings.push(`Cobertura estrutural baixa (${Math.round(report.coverage*100)}%).`);
- report.ok=report.dateColumns>=20&&report.employees>=3&&report.coverage>=.65;
+ if(report.unknownCells)report.warnings.push(`${report.unknownCells} célula(s) preenchida(s) não classificadas como turno/folga.`);
+ report.ok=report.dateColumns>=20&&report.employees>=3&&report.coverage>=.65&&report.dateContinuity>=.80&&report.duplicateDates===0;
+ report.canonical={version:1,sourceFile:fileName||'',sheet:c.name,dates:parsedDates.map(x=>iso(x.date)),periodStart:parsedDates.length?iso(parsedDates[0].date):null,periodEnd:parsedDates.length?iso(parsedDates.at(-1).date):null,employees};
  return report;
 }
 async function inspectFile(file){
- if(!file||!/\.xlsx?$/i.test(file.name))return null;
- const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
- return inspectWorkbook(wb,file.name);
+ if(!file||!/\.(xlsx|xlsm|xls)$/i.test(file.name))return null;
+ const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});return inspectWorkbook(wb,file.name);
 }
-window.ADERENCIA_CANONICAL_VALIDATOR={version:VERSION,inspectWorkbook,inspectFile,getLast:()=>window.ADERENCIA_CANONICAL_LAST||null};
+function badgeClass(r){return!r?'neutral':r.ok&&r.score>=90?'good':r.ok?'attention':'critical'}
+function ensureUI(){
+ if(document.getElementById('canonicalDiagBtn'))return;
+ const host=document.querySelector('#diagnosticPanel .diagnostic-head')||document.getElementById('diagnosticPanel');if(!host)return;
+ const btn=document.createElement('button');btn.id='canonicalDiagBtn';btn.type='button';btn.className='secondary';btn.textContent='Diagnóstico da leitura';btn.style.cssText='margin-left:auto;padding:6px 9px;font-size:9px';btn.disabled=true;host.appendChild(btn);
+ const modal=document.createElement('div');modal.id='canonicalDiagModal';modal.className='modal-backdrop hidden';modal.innerHTML='<div class="modal-card canonical-modal"><div class="canonical-head"><div><p class="panel-kicker">DIAGNÓSTICO ESTRUTURAL</p><h3>Como a engine entendeu a escala</h3></div><button id="canonicalCloseBtn" class="secondary" type="button">Fechar</button></div><div id="canonicalDiagSummary"></div><div id="canonicalDiagWarnings"></div><div class="canonical-table-wrap"><table class="canonical-table"><thead id="canonicalDiagHead"></thead><tbody id="canonicalDiagBody"></tbody></table></div></div>';document.body.appendChild(modal);
+ const st=document.createElement('style');st.id='canonicalDiagStyles';st.textContent='.canonical-modal{width:min(96vw,1250px);max-width:1250px;max-height:90vh;overflow:auto}.canonical-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.canonical-summary{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:8px;margin:12px 0}.canonical-summary div{padding:10px;border:1px solid #e5eaf0;border-radius:10px}.canonical-summary span{display:block;font-size:9px;color:#718096}.canonical-summary strong{font-size:15px}.canonical-warnings{padding:8px 10px;border-radius:8px;background:#fff7ed;color:#9a3412;font-size:10px;margin-bottom:10px}.canonical-ok{background:#ecfdf3;color:#18794e}.canonical-table-wrap{overflow:auto;max-height:52vh;border:1px solid #e5eaf0;border-radius:10px}.canonical-table{border-collapse:separate;border-spacing:0;font-size:9px;white-space:nowrap;width:max-content;min-width:100%}.canonical-table th,.canonical-table td{padding:5px 7px;border-right:1px solid #edf1f5;border-bottom:1px solid #edf1f5;text-align:center}.canonical-table th{position:sticky;top:0;background:#f8fafc;z-index:2}.canonical-table th:first-child,.canonical-table td:first-child{position:sticky;left:0;background:#fff;text-align:left;z-index:1;min-width:180px}.canonical-table thead th:first-child{z-index:3;background:#f8fafc}@media(max-width:900px){.canonical-summary{grid-template-columns:repeat(2,1fr)}}';document.head.appendChild(st);
+ btn.addEventListener('click',renderModal);document.getElementById('canonicalCloseBtn').addEventListener('click',()=>modal.classList.add('hidden'));
+}
+function renderModal(){const r=window.ADERENCIA_CANONICAL_LAST,m=document.getElementById('canonicalDiagModal');if(!r||!m)return;const summary=document.getElementById('canonicalDiagSummary');summary.innerHTML=`<div class="canonical-summary"><div><span>Confiabilidade estrutural</span><strong>${r.score}%</strong></div><div><span>Datas</span><strong>${r.dateColumns}</strong></div><div><span>Colaboradores</span><strong>${r.employees}</strong></div><div><span>Cobertura</span><strong>${Math.round(r.coverage*100)}%</strong></div><div><span>Células reconhecidas</span><strong>${r.codeCells}</strong></div></div>`;const w=document.getElementById('canonicalDiagWarnings');w.className=r.warnings?.length?'canonical-warnings':'canonical-warnings canonical-ok';w.textContent=r.warnings?.length?r.warnings.join(' • '):'Estrutura consistente: nenhuma anomalia relevante encontrada.';const c=r.canonical||{dates:[],employees:[]},head=document.getElementById('canonicalDiagHead'),body=document.getElementById('canonicalDiagBody'),previewDates=c.dates.slice(0,31);head.innerHTML=`<tr><th>Funcionário</th><th>Cargo</th>${previewDates.map(d=>`<th>${d.slice(8,10)}/${d.slice(5,7)}</th>`).join('')}</tr>`;body.innerHTML=c.employees.slice(0,80).map(e=>`<tr><td>${escapeHtml(e.name)}</td><td>${escapeHtml(e.cargo||'—')}</td>${previewDates.map(d=>`<td>${escapeHtml(e.cells[d]||'')}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="3">Nenhuma linha canônica disponível.</td></tr>';m.classList.remove('hidden')}
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
+function publish(report){window.ADERENCIA_CANONICAL_LAST=report;const btn=document.getElementById('canonicalDiagBtn');if(btn){btn.disabled=!report;btn.dataset.state=badgeClass(report);btn.textContent=report?`Diagnóstico ${report.score}%`:'Diagnóstico da leitura'}window.dispatchEvent(new CustomEvent('aderencia:canonicaldiagnostic',{detail:report}))}
+window.ADERENCIA_CANONICAL_VALIDATOR={version:VERSION,inspectWorkbook,inspectFile,getLast:()=>window.ADERENCIA_CANONICAL_LAST||null,getCanonical:()=>window.ADERENCIA_CANONICAL_LAST?.canonical||null};
+document.addEventListener('DOMContentLoaded',ensureUI);
 document.addEventListener('change',async e=>{
  const input=e.target;if(!input||input.id!=='scheduleFile')return;
- const file=input.files?.[0];if(!file||!/\.xlsx?$/i.test(file.name))return;
- try{
-  const report=await inspectFile(file);window.ADERENCIA_CANONICAL_LAST=report;
-  if(report&&!report.ok)console.warn('ADERENCIA RC34: validação estrutural em atenção',report);
-  else if(report)console.info('ADERENCIA RC34: validação estrutural',report);
- }catch(err){window.ADERENCIA_CANONICAL_LAST={version:VERSION,file:file.name,ok:false,error:err.message,checkedAt:new Date().toISOString()};console.warn('ADERENCIA RC34: diagnóstico não concluído',err)}
+ const file=input.files?.[0];if(!file||!/\.(xlsx|xlsm|xls)$/i.test(file.name))return;
+ try{const report=await inspectFile(file);publish(report);if(report&&!report.ok)console.warn('ADERENCIA RC35: validação estrutural em atenção',report);else if(report)console.info('ADERENCIA RC35: validação estrutural',report)}catch(err){const report={version:VERSION,file:file.name,ok:false,score:0,error:err.message,warnings:[`Diagnóstico não concluído: ${err.message}`],checkedAt:new Date().toISOString()};publish(report);console.warn('ADERENCIA RC35: diagnóstico não concluído',err)}
 },true);
 })();
