@@ -21,6 +21,7 @@ document.write('<script src="pdf-schedule-parser-rc28.js"><\/script>');
 document.write('<script src="monitor-export.js"><\/script>');
 document.write('<script src="divergence-dashboard.js"><\/script>');
 document.write('<script src="divergence-capture-rc20.js"><\/script>');
+document.write('<script src="divergence-help-rc42.js"><\/script>');
 document.write('<script src="layout-fixes-rc19.js"><\/script>');
 document.write('<script src="store-management.js"><\/script>');
 document.write('<script src="ui-final-rc35.js"><\/script>');
