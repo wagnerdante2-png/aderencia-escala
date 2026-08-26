@@ -8,11 +8,11 @@ function check(){const missing=REQUIRED.filter(([k])=>!window[k]);const optional
 function loadBatch(){if(document.querySelector('script[data-aderencia-batch]'))return;const s=document.createElement('script');s.src='batch.js';s.dataset.aderenciaBatch='1';s.defer=true;document.head.appendChild(s)}
 window.addEventListener('error',e=>console.error('Erro global da aplicação:',e.error||e.message));
 check();
-const badge=document.querySelector('.privacy');if(badge)badge.textContent='Processamento local no navegador • v1.0 RC30';
+const badge=document.querySelector('.privacy');if(badge)badge.textContent='Processamento local no navegador • v1.0 RC31';
+document.write('<script src="portable-storage.js"><\/script>');
 document.write('<script src="point-semantics.js"><\/script>');
 document.write('<script src="pdf-xlsx-compat-rc21.js"><\/script>');
 document.write('<script src="pdf-ocr-guard-rc27.js"><\/script>');
-/* RC29 valida o calendário impresso antes de permitir que o RC28 alinhe o PDF ao espelho. Se a grade visual pertencer a outro ciclo, o cálculo é bloqueado. */
 document.write('<script src="pdf-calendar-integrity-rc29.js"><\/script>');
 document.write('<script src="pdf-schedule-parser-rc28.js"><\/script>');
 document.write('<script src="monitor-export.js"><\/script>');
