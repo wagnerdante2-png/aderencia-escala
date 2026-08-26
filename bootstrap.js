@@ -27,6 +27,7 @@ document.write('<script src="ui-final-rc35.js"><\/script>');
 document.write('<script src="network-led-panel-rc36.js"><\/script>');
 document.write('<script src="competence-integrity-rc38.js"><\/script>');
 document.write('<script src="region-view-integrity-rc38.js"><\/script>');
+document.write('<script src="rc38-integrity-check.js"><\/script>');
 document.addEventListener('DOMContentLoaded',()=>{const r=window.ADERENCIA_STORE_REGISTRY;if(r)r.importRegistry(r.load())});
 loadBatch();
 })();
