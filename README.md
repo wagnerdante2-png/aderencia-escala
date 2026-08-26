@@ -38,7 +38,7 @@ Procura os metadados `Espelho do Ponto`, `Matrícula`, `Nome`, `Departamento / M
 
 ## Diagnóstico estrutural
 
-A RC35 possui uma camada paralela de inspeção que não altera a fórmula de aderência. Ela produz uma representação canônica `Funcionário × Data × Código`, mede continuidade temporal, cobertura da matriz, quantidade de colaboradores e células não classificadas e disponibiliza o botão **Diagnóstico da leitura** para visualizar como a escala foi interpretada.
+A RC36 preserva a camada paralela de inspeção da RC35. Ela não altera a fórmula de aderência e produz uma representação canônica `Funcionário × Data × Código`, mede continuidade temporal, cobertura da matriz, quantidade de colaboradores e células não classificadas e disponibiliza o botão **Diagnóstico da leitura** para visualizar como a escala foi interpretada.
 
 Esse diagnóstico funciona tanto com Excel/XLSM/XLS quanto com o XLSX sintético produzido quando uma escala PDF é interpretada.
 
@@ -48,6 +48,7 @@ Esse diagnóstico funciona tanto com Excel/XLSM/XLS quanto com o XLSX sintético
 - cadastro dinâmico de lojas sem necessidade de alteração do código;
 - atribuição de cada loja a uma regional;
 - filtros por regional em Histórico, Monitoramento e Semestral;
+- ML61 Vinhedo pertence a **GUARDIÕES DA CHAMA**;
 - opção **Criar base** para gerar `aderencia-dados.json`;
 - opção **Vincular base** para usar uma base portátil existente em outro computador;
 - gravação automática da base vinculada após alterações persistentes;
@@ -58,6 +59,19 @@ Esse diagnóstico funciona tanto com Excel/XLSM/XLS quanto com o XLSX sintético
 - relatórios PDF;
 - exportação Excel do monitoramento mensal para BI;
 - backup/restauração manual continua disponível como contingência.
+
+## Mini painel LED da rede
+
+A RC36 adiciona um painel compacto de leitura rápida logo abaixo da navegação principal. Ele mostra, para a competência selecionada:
+
+- média de aderência da rede;
+- quantidade de lojas verdes (≥95%);
+- quantidade de lojas amarelas (80% a 94,99%);
+- quantidade de lojas vermelhas (<80%);
+- quantidade de lojas sem resultado;
+- cobertura da rede no mês.
+
+O painel inicia no mês/ano atual e pode ser alterado dinamicamente. Ao mudar a competência no painel LED, o filtro mensal do Monitoramento é sincronizado; ao mudar o mês/ano no Monitoramento, o painel LED acompanha a alteração.
 
 A base portátil utiliza a File System Access API disponível em navegadores Chromium compatíveis, como Edge e Chrome atualizados. Por segurança do navegador, a primeira criação/vinculação e eventual renovação de permissão exigem ação do usuário.
 
@@ -89,4 +103,4 @@ Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
 
 ## Versão
 
-Pré-release operacional: **v1.0 RC35**.
+Pré-release operacional: **v1.0 RC36**.
