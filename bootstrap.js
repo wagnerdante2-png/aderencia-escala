@@ -20,5 +20,6 @@ document.write('<script src="divergence-dashboard.js"><\/script>');
 document.write('<script src="divergence-capture-rc20.js"><\/script>');
 document.write('<script src="layout-fixes-rc19.js"><\/script>');
 document.write('<script src="store-management.js"><\/script>');
+document.addEventListener('DOMContentLoaded',()=>{const r=window.ADERENCIA_STORE_REGISTRY;if(r)r.importRegistry(r.load())});
 loadBatch();
 })();
