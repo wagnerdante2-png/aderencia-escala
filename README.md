@@ -36,15 +36,27 @@ Procura os metadados `Espelho do Ponto`, `Matrícula`, `Nome`, `Departamento / M
 
 É uma contingência. O sistema reconstrói a matriz visual Nome × Dias por posição dos elementos do PDF, associa cada célula ao período do espelho e valida o calendário impresso antes do cálculo. Se o PDF aparentar pertencer a outro ciclo, o cálculo é bloqueado para evitar aderência falsa.
 
-## Histórico e relatórios
+## Histórico, base portátil e relatórios
 
-- histórico mensal salvo no `localStorage` do navegador;
+- histórico mensal mantido no `localStorage` como cache local;
+- opção **Criar base** para gerar `aderencia-dados.json`;
+- opção **Vincular base** para usar uma base portátil existente em outro computador;
+- gravação automática da base vinculada após alterações persistentes;
+- histórico, divergências persistidas e configuração administrativa fazem parte da base portátil;
 - monitoramento das 61 lojas;
 - visão semestral;
 - divergências por colaborador;
 - relatórios PDF;
 - exportação Excel do monitoramento mensal para BI;
-- backup/restauração do histórico.
+- backup/restauração manual continua disponível como contingência.
+
+A base portátil utiliza a File System Access API disponível em navegadores Chromium compatíveis, como Edge e Chrome atualizados. Por segurança do navegador, a primeira criação/vinculação e eventual renovação de permissão exigem ação do usuário.
+
+## Administrador
+
+O menu **Administrador** não possui senha e contém uma flag para habilitar ou ocultar o botão **Limpar histórico**. A configuração também é preservada na base portátil.
+
+Quando o histórico é efetivamente zerado, os detalhes de divergências vinculados ao histórico também são limpos para impedir reaparecimento de dados antigos.
 
 ## Processamento em lote
 
@@ -52,9 +64,11 @@ A aba de lote reutiliza o mesmo motor da análise individual. Cada par de arquiv
 
 ## Executar localmente
 
-1. Baixe o repositório em ZIP.
+1. Baixe o pacote em ZIP.
 2. Extraia a pasta.
 3. Abra `index.html` com duplo clique.
+4. Preferencialmente use Edge ou Chrome atualizado.
+5. Clique em **Criar base** na primeira utilização e salve `aderencia-dados.json` junto da aplicação.
 
 Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
 
@@ -62,4 +76,4 @@ Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
 
 ## Versão
 
-Pré-release operacional: **v1.0 RC30**.
+Pré-release operacional: **v1.0 RC32**.
