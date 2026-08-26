@@ -1,4 +1,4 @@
-ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC35
+ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC40
 
 1. Extraia a pasta do pacote.
 2. Abra index.html com duplo clique, preferencialmente no Microsoft Edge ou Google Chrome atualizado.
@@ -10,9 +10,15 @@ ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC35
 8. Antes de confiar em uma leitura incomum, use "Diagnóstico da leitura" para conferir a matriz Funcionário × Data × Código interpretada pela engine.
 9. Salve o resultado no histórico quando estiver validado.
 
+COMPETÊNCIA: o mês pertence ao início do período integral do espelho. Exemplo: 11/06 a 10/07 = Junho; 11/07 a 10/08 = Julho. Se a escala cobrir apenas parte do ciclo, o cálculo usa proporcionalmente os dias de interseção disponíveis.
+
+O seletor Mês/Ano do painel superior é a competência global. Ao alterá-lo, Histórico, Monitoramento, Divergências, Evolução, Semestral pelo ano e exportações relacionadas acompanham a mesma referência temporal.
+
+A aba Evolução apresenta barras mensais da seleção atual e linha da média da rede, com filtros por regional e loja.
+
 O histórico continua existindo também no navegador como cache/contingência. Quando uma base portátil está vinculada e autorizada, alterações persistentes são gravadas automaticamente no JSON.
 
-O menu Lojas permite cadastrar novas unidades e atribuir uma regional sem alterar o programa. Histórico, Monitoramento e Semestral podem ser filtrados por regional.
+O menu Lojas permite cadastrar novas unidades e atribuir uma regional sem alterar o programa. ML61 Vinhedo pertence a Guardiões da Chama.
 
 O menu Administrador permite habilitar ou ocultar o botão "Limpar histórico". Não há senha. Quando o histórico é apagado, as divergências relacionadas também são zeradas e a base portátil vinculada recebe a alteração.
 
