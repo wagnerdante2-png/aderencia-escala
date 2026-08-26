@@ -1,15 +1,18 @@
-ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC32
+ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC35
 
 1. Extraia a pasta do pacote.
 2. Abra index.html com duplo clique, preferencialmente no Microsoft Edge ou Google Chrome atualizado.
 3. Na primeira utilização, clique em "Criar base" e salve o arquivo aderencia-dados.json, de preferência dentro da própria pasta da aplicação.
-4. Em outro computador, use "Vincular base" e selecione o mesmo aderencia-dados.json para recuperar o histórico.
+4. Em outro computador, use "Vincular base" e selecione o mesmo aderencia-dados.json para recuperar histórico, divergências, configurações e cadastro de lojas/regionais.
 5. Selecione o PDF do espelho de ponto.
 6. Selecione a escala, preferencialmente em XLSX/XLSM/XLS. PDF de escala é aceito como contingência e passa por validações adicionais.
 7. Clique em Calcular aderência.
-8. Salve o resultado no histórico quando estiver validado.
+8. Antes de confiar em uma leitura incomum, use "Diagnóstico da leitura" para conferir a matriz Funcionário × Data × Código interpretada pela engine.
+9. Salve o resultado no histórico quando estiver validado.
 
 O histórico continua existindo também no navegador como cache/contingência. Quando uma base portátil está vinculada e autorizada, alterações persistentes são gravadas automaticamente no JSON.
+
+O menu Lojas permite cadastrar novas unidades e atribuir uma regional sem alterar o programa. Histórico, Monitoramento e Semestral podem ser filtrados por regional.
 
 O menu Administrador permite habilitar ou ocultar o botão "Limpar histórico". Não há senha. Quando o histórico é apagado, as divergências relacionadas também são zeradas e a base portátil vinculada recebe a alteração.
 
