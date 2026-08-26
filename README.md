@@ -36,14 +36,23 @@ Procura os metadados `Espelho do Ponto`, `Matrícula`, `Nome`, `Departamento / M
 
 É uma contingência. O sistema reconstrói a matriz visual Nome × Dias por posição dos elementos do PDF, associa cada célula ao período do espelho e valida o calendário impresso antes do cálculo. Se o PDF aparentar pertencer a outro ciclo, o cálculo é bloqueado para evitar aderência falsa.
 
-## Histórico, base portátil e relatórios
+## Diagnóstico estrutural
+
+A RC35 possui uma camada paralela de inspeção que não altera a fórmula de aderência. Ela produz uma representação canônica `Funcionário × Data × Código`, mede continuidade temporal, cobertura da matriz, quantidade de colaboradores e células não classificadas e disponibiliza o botão **Diagnóstico da leitura** para visualizar como a escala foi interpretada.
+
+Esse diagnóstico funciona tanto com Excel/XLSM/XLS quanto com o XLSX sintético produzido quando uma escala PDF é interpretada.
+
+## Histórico, lojas, regionais e base portátil
 
 - histórico mensal mantido no `localStorage` como cache local;
+- cadastro dinâmico de lojas sem necessidade de alteração do código;
+- atribuição de cada loja a uma regional;
+- filtros por regional em Histórico, Monitoramento e Semestral;
 - opção **Criar base** para gerar `aderencia-dados.json`;
 - opção **Vincular base** para usar uma base portátil existente em outro computador;
 - gravação automática da base vinculada após alterações persistentes;
-- histórico, divergências persistidas e configuração administrativa fazem parte da base portátil;
-- monitoramento das 61 lojas;
+- histórico, divergências, configuração administrativa e cadastro de lojas/regionais fazem parte da base portátil;
+- monitoramento baseado nas lojas cadastradas, sem quantidade fixa de unidades;
 - visão semestral;
 - divergências por colaborador;
 - relatórios PDF;
@@ -62,6 +71,10 @@ Quando o histórico é efetivamente zerado, os detalhes de divergências vincula
 
 A aba de lote reutiliza o mesmo motor da análise individual. Cada par de arquivos é processado sequencialmente. Erros de leitura, loja, período ou calendário incompatível interrompem apenas aquela linha e são exibidos diretamente no lote.
 
+## Segurança de PDF
+
+A aplicação força `isEvalSupported=false` no PDF.js antes de carregar os parsers, reduzindo a superfície de execução dinâmica ao abrir PDFs locais.
+
 ## Executar localmente
 
 1. Baixe o pacote em ZIP.
@@ -76,4 +89,4 @@ Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
 
 ## Versão
 
-Pré-release operacional: **v1.0 RC32**.
+Pré-release operacional: **v1.0 RC35**.
