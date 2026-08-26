@@ -20,9 +20,9 @@ O processamento acontece no próprio navegador. Os arquivos selecionados não s�
 - fórmula: `1 - (desvios + 10 × não conformidades) / total de marcações consideradas`;
 - o resultado visual é limitado entre 0% e 100%.
 
-O sistema também valida loja/período, normaliza nomes, sinaliza colaboradores não conciliados e bloqueia combinações sem qualquer interseção de datas.
+O sistema também valida loja/período, normaliza nomes, sinaliza colaboradores não conciliados e bloqueia somente combinações sem qualquer interseção de datas.
 
-## Competência operacional RC38
+## Competência operacional
 
 A competência mensal é definida pelo **início do período integral do espelho de ponto**.
 
@@ -34,7 +34,23 @@ A data final da escala ou a data final da interseção não define a competênci
 
 Se a escala cobrir somente parte do ciclo do espelho, inclusive casos como `01–30` ou `01–31`, o cálculo é feito proporcionalmente somente nos dias existentes na interseção. O resultado não é rejeitado apenas porque a escala não cobre todos os dias do espelho.
 
-Essa mesma competência é usada em Histórico, painel LED, Monitoramento, Semestral, Divergências, processamento em lote e exportações.
+Essa mesma competência é usada em Histórico, painel LED, Monitoramento, Semestral, Divergências, Evolução, processamento em lote e exportações.
+
+## Competência global RC40
+
+A RC40 unifica o seletor de **Mês / Ano** no painel superior. Ele passa a ser a referência temporal de todo o ecossistema de visualização.
+
+Ao alterar a competência global, são sincronizados automaticamente:
+
+- Histórico;
+- Monitoramento;
+- Divergências;
+- Semestral pelo ano correspondente;
+- painel LED;
+- aba Evolução;
+- relatórios e exportações que utilizam esses filtros.
+
+Os seletores mensais duplicados das telas internas ficam ocultos para reduzir risco de leituras contraditórias. A competência apurada pelo motor continua prevalecendo no momento de salvar uma análise: um espelho `11/06–10/07` sempre conduz o sistema para **Junho/2026**, independentemente do mês que estivesse sendo visualizado antes do cálculo.
 
 ## Estruturas reconhecidas
 
@@ -52,11 +68,11 @@ Procura os metadados `Espelho do Ponto`, `Matrícula`, `Nome`, `Departamento / M
 
 ## Diagnóstico estrutural
 
-A RC38 preserva a camada paralela de inspeção introduzida nas RC35/RC36. Ela não altera a fórmula de aderência e produz uma representação canônica `Funcionário × Data × Código`, mede continuidade temporal, cobertura da matriz, quantidade de colaboradores e células não classificadas e disponibiliza o botão **Diagnóstico da leitura** para visualizar como a escala foi interpretada.
+A camada paralela de inspeção não altera a fórmula de aderência. Ela produz uma representação canônica `Funcionário × Data × Código`, mede continuidade temporal, cobertura da matriz, quantidade de colaboradores e células não classificadas e disponibiliza o botão **Diagnóstico da leitura**.
 
 Esse diagnóstico funciona tanto com Excel/XLSM/XLS quanto com o XLSX sintético produzido quando uma escala PDF é interpretada.
 
-A RC38 adiciona ainda uma verificação não destrutiva de integridade no carregamento. Em operação normal, `ADERENCIA_RC38_HEALTH.ok` deve permanecer `true` no console do navegador.
+A RC40 mantém ainda uma auditoria não destrutiva em tempo de execução. Em operação normal, `ADERENCIA_RC40_HEALTH.ok` deve permanecer `true` no console do navegador.
 
 ## Histórico, lojas, regionais e base portátil
 
@@ -78,7 +94,7 @@ A RC38 adiciona ainda uma verificação não destrutiva de integridade no carreg
 
 ## Mini painel LED da rede
 
-O painel compacto de leitura rápida mostra, para a competência selecionada:
+O painel compacto superior é também o **seletor mestre de competência**. Para a competência selecionada ele mostra:
 
 - média de aderência da rede;
 - quantidade de lojas verdes (≥95%);
@@ -87,9 +103,19 @@ O painel compacto de leitura rápida mostra, para a competência selecionada:
 - quantidade de lojas sem resultado;
 - cobertura da rede no mês.
 
-Ao mudar a competência no painel LED, o filtro mensal do Monitoramento é sincronizado; ao mudar o mês/ano no Monitoramento, o painel LED acompanha a alteração.
+## Evolução
 
-A base portátil utiliza a File System Access API disponível em navegadores Chromium compatíveis, como Edge e Chrome atualizados. Por segurança do navegador, a primeira criação/vinculação e eventual renovação de permissão exigem ação do usuário.
+A aba **Evolução** permite acompanhar o ano inteiro com visual combinado:
+
+- barras = aderência mensal da seleção atual;
+- linha = média mensal da rede;
+- filtros por regional e loja;
+- destaque para o mês da competência global;
+- variação contra o mês anterior;
+- quantidade de lojas com resultado no mês e tamanho da base selecionada;
+- linhas de referência de 80% e 95%.
+
+Meses sem dados não são ligados artificialmente pela linha, evitando sugerir continuidade onde não existe resultado salvo.
 
 ## Administrador
 
@@ -101,7 +127,7 @@ Quando o histórico é efetivamente zerado, os detalhes de divergências vincula
 
 A aba de lote reutiliza o mesmo motor da análise individual. Cada par de arquivos é processado sequencialmente. Erros de leitura, loja ou período interrompem apenas aquela linha e são exibidos diretamente no lote.
 
-O salvamento em lote usa a mesma regra RC38: a competência vem do início do período integral do espelho de cada linha.
+O salvamento em lote usa a mesma regra canônica: a competência vem do início do período integral do espelho de cada linha.
 
 ## Divergências por colaborador
 
@@ -125,4 +151,4 @@ Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
 
 ## Versão
 
-Pré-release operacional: **v1.0 RC38**.
+Candidata operacional consolidada: **v1.0 RC40**.
