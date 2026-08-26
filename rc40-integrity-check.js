@@ -1,13 +1,13 @@
 (function(){
 'use strict';
-if(window.__ADERENCIA_RC41_INTEGRITY_CHECK__)return;
-window.__ADERENCIA_RC41_INTEGRITY_CHECK__=true;
+if(window.__ADERENCIA_RC42_INTEGRITY_CHECK__)return;
+window.__ADERENCIA_RC42_INTEGRITY_CHECK__=true;
 const results=[];
 const add=(name,ok,detail='')=>results.push({name,ok:!!ok,detail:String(detail||'')});
 const competence=start=>{const m=String(start||'').match(/^(20\d{2})-(\d{2})-(\d{2})$/);return m?`${m[1]}-${m[2]}`:null};
 function run(){
  results.length=0;
- add('version',window.ADERENCIA_VERSION==='v1.0 RC41',window.ADERENCIA_VERSION);
+ add('version',window.ADERENCIA_VERSION==='v1.0 RC42',window.ADERENCIA_VERSION);
  add('competence 11/06→10/07',competence('2026-06-11')==='2026-06');
  add('competence 11/07→10/08',competence('2026-07-11')==='2026-07');
  add('competence year rollover',competence('2026-12-11')==='2026-12');
@@ -17,6 +17,8 @@ function run(){
  add('evolution api',!!window.ADERENCIA_EVOLUTION?.render);
  add('divergence dashboard',!!window.__ADERENCIA_DIVERGENCE_DASHBOARD__);
  add('canonical divergence capture',!!window.__ADERENCIA_DIVERGENCE_CAPTURE_RC20__);
+ add('divergence audit',!!window.__ADERENCIA_DIVERGENCE_AUDIT_RC42__);
+ add('performance layer',!!window.__ADERENCIA_PERFORMANCE_RC42__);
  add('store registry',!!window.ADERENCIA_STORE_REGISTRY?.load);
  const ml61=window.ADERENCIA_STORE_REGISTRY?.regionOf?.('ML61');
  add('ML61 regional',ml61==='GUARDIÕES DA CHAMA',ml61||'');
@@ -28,14 +30,15 @@ function run(){
  }
  add('evolution view installed',!!document.getElementById('evolutionTab')&&!!document.getElementById('evolutionView'));
  add('startup controller guarded',!!window.__ADERENCIA_PERIOD_CONTROLLER_RC41__);
+ const d=window.ADERENCIA_AUDIT_DIVERGENCES?.();
+ if(d)add('persisted divergence consistency',d.ok,d.failures?.length||0);
  const failures=results.filter(x=>!x.ok);
- window.ADERENCIA_RC41_HEALTH={ok:!failures.length,checkedAt:new Date().toISOString(),checks:[...results],failures};
- window.ADERENCIA_RC40_HEALTH=window.ADERENCIA_RC41_HEALTH;
- window.ADERENCIA_RC39_HEALTH=window.ADERENCIA_RC41_HEALTH;
- window.ADERENCIA_RC38_HEALTH=window.ADERENCIA_RC41_HEALTH;
- if(failures.length)console.error('RC41: falha na auditoria de integridade',failures);
- else console.info('RC41: auditoria de integridade aprovada',results);
+ window.ADERENCIA_RC42_HEALTH={ok:!failures.length,checkedAt:new Date().toISOString(),checks:[...results],failures};
+ window.ADERENCIA_RC41_HEALTH=window.ADERENCIA_RC42_HEALTH;
+ window.ADERENCIA_RC40_HEALTH=window.ADERENCIA_RC42_HEALTH;
+ if(failures.length)console.error('RC42: falha na auditoria de integridade',failures);
+ else console.info('RC42: auditoria de integridade aprovada',results);
 }
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,700));else setTimeout(run,700);
-window.addEventListener('aderencia:periodchange',()=>setTimeout(run,120));
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,1000));else setTimeout(run,1000);
+window.addEventListener('aderencia:periodchange',()=>setTimeout(run,180));
 })();
