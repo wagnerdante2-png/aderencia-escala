@@ -17,19 +17,24 @@ function normalize(src){
  if(src&&typeof src==='object')return Object.assign({},src,hardened);
  return src;
 }
-function getBuffer(src){
+/*
+ * A chave precisa preservar a identidade da entrada exata. Duas views podem
+ * compartilhar o mesmo ArrayBuffer com byteOffset/byteLength diferentes; usar
+ * apenas data.buffer faria documentos distintos colidirem no cache.
+ */
+function getCacheKey(src){
  const data=src?.data;
- return data instanceof ArrayBuffer?data:(ArrayBuffer.isView(data)?data.buffer:null);
+ return (data instanceof ArrayBuffer||ArrayBuffer.isView(data))?data:null;
 }
 function secureGetDocument(src){
- const safe=normalize(src),buffer=getBuffer(safe);
- if(buffer){
-   const found=cache.get(buffer);
+ const safe=normalize(src),key=getCacheKey(safe);
+ if(key){
+   const found=cache.get(key);
    if(found){window.ADERENCIA_RUNTIME_CACHE?.notePdf?.(true);return found}
    window.ADERENCIA_RUNTIME_CACHE?.notePdf?.(false);
    const task=originalGet(safe);
-   cache.set(buffer,task);
-   task.promise?.catch?.(()=>cache.delete(buffer));
+   cache.set(key,task);
+   task.promise?.catch?.(()=>cache.delete(key));
    return task;
  }
  return originalGet(safe);
