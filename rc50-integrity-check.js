@@ -32,6 +32,7 @@ function run(){
  if(!ok)console.warn('RC50 integrity issues',checks.filter(x=>!x.ok));else console.info('RC50 integrity OK');
  return window.ADERENCIA_RC50_HEALTH;
 }
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,400),{once:true});else setTimeout(run,400);
+const schedule=()=>setTimeout(run,1200);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});else schedule();
 window.ADERENCIA_RUN_RC50_CHECK=run;
 })();
