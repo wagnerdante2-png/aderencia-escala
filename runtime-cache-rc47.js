@@ -26,10 +26,16 @@ if(window.XLSX?.read){
   const original=XLSX.read.bind(XLSX);
   XLSX.read=function(data,opts){
     try{
-      const buffer=data instanceof ArrayBuffer?data:(ArrayBuffer.isView(data)?data.buffer:null);
-      if(buffer){
-        let byOptions=xlsxCache.get(buffer);
-        if(!byOptions){byOptions=new Map();xlsxCache.set(buffer,byOptions)}
+      /*
+       * Preserve a identidade da entrada exata, não apenas do ArrayBuffer
+       * subjacente. Duas TypedArray views distintas podem compartilhar o mesmo
+       * buffer com byteOffset/byteLength diferentes e representar planilhas
+       * diferentes; usar data.buffer faria essas entradas colidirem no cache.
+       */
+      const inputKey=(data instanceof ArrayBuffer||ArrayBuffer.isView(data))?data:null;
+      if(inputKey){
+        let byOptions=xlsxCache.get(inputKey);
+        if(!byOptions){byOptions=new Map();xlsxCache.set(inputKey,byOptions)}
         const key=JSON.stringify({type:opts?.type||'',cellDates:!!opts?.cellDates,cellFormula:opts?.cellFormula!==false,dense:!!opts?.dense,raw:opts?.raw});
         if(byOptions.has(key)){stats.xlsxHits++;return byOptions.get(key)}
         stats.xlsxMisses++;
