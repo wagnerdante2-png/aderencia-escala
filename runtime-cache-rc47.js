@@ -22,6 +22,18 @@ if(window.File?.prototype?.arrayBuffer){
  * interrompia a inicialização do módulo antes da publicação desta API.
  */
 let xlsxCache=new WeakMap();
+function xlsxOptionsKey(opts){
+  if(opts==null)return '{}';
+  if(typeof opts!=='object')return null;
+  const normalized={};
+  for(const key of Object.keys(opts).sort()){
+    const value=opts[key];
+    if(value===undefined){normalized[key]='__undefined__';continue}
+    if(value===null||['string','number','boolean'].includes(typeof value)){normalized[key]=value;continue}
+    return null;
+  }
+  try{return JSON.stringify(normalized)}catch{return null}
+}
 if(window.XLSX?.read){
   const original=XLSX.read.bind(XLSX);
   XLSX.read=function(data,opts){
@@ -33,14 +45,14 @@ if(window.XLSX?.read){
        * diferentes; usar data.buffer faria essas entradas colidirem no cache.
        */
       const inputKey=(data instanceof ArrayBuffer||ArrayBuffer.isView(data))?data:null;
-      if(inputKey){
+      const optionKey=xlsxOptionsKey(opts);
+      if(inputKey&&optionKey!==null){
         let byOptions=xlsxCache.get(inputKey);
         if(!byOptions){byOptions=new Map();xlsxCache.set(inputKey,byOptions)}
-        const key=JSON.stringify({type:opts?.type||'',cellDates:!!opts?.cellDates,cellFormula:opts?.cellFormula!==false,dense:!!opts?.dense,raw:opts?.raw});
-        if(byOptions.has(key)){stats.xlsxHits++;return byOptions.get(key)}
+        if(byOptions.has(optionKey)){stats.xlsxHits++;return byOptions.get(optionKey)}
         stats.xlsxMisses++;
         const wb=original(data,opts);
-        byOptions.set(key,wb);
+        byOptions.set(optionKey,wb);
         return wb;
       }
     }catch(e){console.warn('RC47 XLSX cache bypass:',e)}
