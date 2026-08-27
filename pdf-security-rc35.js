@@ -10,7 +10,7 @@ if(!window.pdfjsLib||typeof window.pdfjsLib.getDocument!=='function'||window.__A
 window.__ADERENCIA_PDF_HARDENED__=true;
 const originalLib=window.pdfjsLib;
 const originalGet=originalLib.getDocument.bind(originalLib);
-const cache=new WeakMap();
+let cache=new WeakMap();
 function normalize(src){
  const hardened={isEvalSupported:false,enableScripting:false};
  if(src instanceof ArrayBuffer||ArrayBuffer.isView(src))return Object.assign({data:src},hardened);
@@ -51,5 +51,6 @@ try{
  return;
 }
 window.ADERENCIA_PDF_OPEN=secureGetDocument;
+window.ADERENCIA_PDF_CACHE_CLEAR=function(){cache=new WeakMap();};
 window.ADERENCIA_PDF_SECURITY={version:'RC50',isEvalSupported:false,enableScripting:false,active:true,mode:'namespace-facade'};
 })();
