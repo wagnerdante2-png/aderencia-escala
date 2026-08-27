@@ -2,7 +2,7 @@ name: RC50 End-to-End
 
 on:
   push:
-    branches: [rc50-e2e-hardening]
+    branches: [rc50-e2e-hardening, rc50-main-consolidation, main]
   workflow_dispatch:
 
 permissions:
