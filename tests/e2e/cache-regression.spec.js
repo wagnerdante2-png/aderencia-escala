@@ -41,6 +41,45 @@ test('XLSX cache keeps distinct typed-array views isolated', async ({ page }) =>
   expect(result.stats).toEqual({ hits: 1, misses: 2 });
 });
 
+test('XLSX cache isolates parsing options beyond the legacy subset', async ({ page }) => {
+  await page.goto('/index.html');
+  const result = await page.evaluate(async () => {
+    const code = await fetch('/runtime-cache-rc47.js').then(r => r.text());
+    const frame = document.createElement('iframe');
+    document.body.appendChild(frame);
+    const w = frame.contentWindow;
+    const calls = [];
+    w.XLSX = {
+      read(data, opts) {
+        const workbook = { marker: calls.length + 1, opts: { ...opts } };
+        calls.push(workbook);
+        return workbook;
+      }
+    };
+    w.eval(code);
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    const oneRow = w.XLSX.read(bytes, { type: 'array', sheetRows: 1 });
+    const twoRows = w.XLSX.read(bytes, { type: 'array', sheetRows: 2 });
+    const oneRowAgain = w.XLSX.read(bytes, { sheetRows: 1, type: 'array' });
+    const snapshot = {
+      distinctOptions: oneRow !== twoRows,
+      sameOptionsIgnoreOrder: oneRow === oneRowAgain,
+      callCount: calls.length,
+      stats: {
+        hits: w.ADERENCIA_RUNTIME_CACHE.stats.xlsxHits,
+        misses: w.ADERENCIA_RUNTIME_CACHE.stats.xlsxMisses
+      }
+    };
+    frame.remove();
+    return snapshot;
+  });
+
+  expect(result.distinctOptions).toBeTruthy();
+  expect(result.sameOptionsIgnoreOrder).toBeTruthy();
+  expect(result.callCount).toBe(2);
+  expect(result.stats).toEqual({ hits: 1, misses: 2 });
+});
+
 test('runtime cache clear invalidates file, XLSX and PDF caches', async ({ page }) => {
   await page.goto('/index.html');
   const result = await page.evaluate(async () => {
