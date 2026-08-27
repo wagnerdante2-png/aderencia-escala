@@ -3,7 +3,7 @@
 if(window.__ADERENCIA_RUNTIME_CACHE_RC47__)return;
 window.__ADERENCIA_RUNTIME_CACHE_RC47__=true;
 const stats={fileHits:0,fileMisses:0,pdfHits:0,pdfMisses:0,xlsxHits:0,xlsxMisses:0,startedAt:new Date().toISOString()};
-const fileBuffers=new WeakMap();
+let fileBuffers=new WeakMap();
 if(window.File?.prototype?.arrayBuffer){
   const original=File.prototype.arrayBuffer;
   File.prototype.arrayBuffer=function(){
@@ -21,7 +21,7 @@ if(window.File?.prototype?.arrayBuffer){
  * PDF.js e seu getDocument pode ser não-gravável; sobrescrevê-lo diretamente
  * interrompia a inicialização do módulo antes da publicação desta API.
  */
-const xlsxCache=new WeakMap();
+let xlsxCache=new WeakMap();
 if(window.XLSX?.read){
   const original=XLSX.read.bind(XLSX);
   XLSX.read=function(data,opts){
@@ -48,6 +48,11 @@ if(window.XLSX?.read){
   };
 }
 function notePdf(hit){if(hit)stats.pdfHits++;else stats.pdfMisses++}
-function clear(){stats.clearedAt=new Date().toISOString();}
+function clear(){
+  fileBuffers=new WeakMap();
+  xlsxCache=new WeakMap();
+  window.ADERENCIA_PDF_CACHE_CLEAR?.();
+  stats.clearedAt=new Date().toISOString();
+}
 window.ADERENCIA_RUNTIME_CACHE={version:'RC50',stats,clear,notePdf};
 })();
