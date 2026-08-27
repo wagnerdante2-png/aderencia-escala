@@ -22,9 +22,16 @@ function normalize(src){
  * A chave precisa preservar a identidade da entrada exata. Duas views podem
  * compartilhar o mesmo ArrayBuffer com byteOffset/byteLength diferentes; usar
  * apenas data.buffer faria documentos distintos colidirem no cache.
+ *
+ * Objetos com opções adicionais (por exemplo password/rangeChunkSize) não
+ * podem compartilhar apenas a identidade de data, pois isso reaproveitaria uma
+ * task criada com configuração diferente. Nesses casos o cache é ignorado.
  */
 function getCacheKey(src){
- const data=src?.data;
+ if(!src||typeof src!=='object')return null;
+ const allowed=new Set(['data','isEvalSupported','enableScripting']);
+ if(Object.keys(src).some(key=>!allowed.has(key)))return null;
+ const data=src.data;
  return (data instanceof ArrayBuffer||ArrayBuffer.isView(data))?data:null;
 }
 function secureGetDocument(src){
