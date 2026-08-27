@@ -80,6 +80,45 @@ test('XLSX cache isolates parsing options beyond the legacy subset', async ({ pa
   expect(result.stats).toEqual({ hits: 1, misses: 2 });
 });
 
+test('XLSX cache bypasses non-finite numeric option keys', async ({ page }) => {
+  await page.goto('/index.html');
+  const result = await page.evaluate(async () => {
+    const code = await fetch('/runtime-cache-rc47.js').then(r => r.text());
+    const frame = document.createElement('iframe');
+    document.body.appendChild(frame);
+    const w = frame.contentWindow;
+    const calls = [];
+    w.XLSX = {
+      read(data, opts) {
+        const workbook = { marker: calls.length + 1, opts: { ...opts } };
+        calls.push(workbook);
+        return workbook;
+      }
+    };
+    w.eval(code);
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    const nanOne = w.XLSX.read(bytes, { type: 'array', sheetRows: NaN });
+    const nanTwo = w.XLSX.read(bytes, { type: 'array', sheetRows: NaN });
+    const nullOne = w.XLSX.read(bytes, { type: 'array', sheetRows: null });
+    const nullTwo = w.XLSX.read(bytes, { type: 'array', sheetRows: null });
+    const snapshot = {
+      nanBypassed: nanOne !== nanTwo,
+      nullCached: nullOne === nullTwo,
+      nanNotCollidingWithNull: nanOne !== nullOne,
+      callCount: calls.length
+    };
+    frame.remove();
+    return snapshot;
+  });
+
+  expect(result).toEqual({
+    nanBypassed: true,
+    nullCached: true,
+    nanNotCollidingWithNull: true,
+    callCount: 3
+  });
+});
+
 test('runtime cache clear invalidates file, XLSX and PDF caches', async ({ page }) => {
   await page.goto('/index.html');
   const result = await page.evaluate(async () => {
