@@ -6,14 +6,17 @@ test.beforeEach(async ({ page }) => {
   await page.reload();
 });
 
-test('startup has no uncaught errors and core libraries initialize', async ({ page }) => {
+test('startup has no uncaught errors and RC50 integrity is green', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.waitForLoadState('networkidle');
+  await page.waitForFunction(() => window.ADERENCIA_RC50_HEALTH);
   await expect(page.locator('h1')).toHaveText('Aderência de Escala');
-  const health = await page.evaluate(() => window.ADERENCIA_HEALTH);
-  expect(health).toBeTruthy();
-  expect(health.ok).toBeTruthy();
+  const health = await page.evaluate(() => ({ core: window.ADERENCIA_HEALTH, final: window.ADERENCIA_RC50_HEALTH, pdf: window.ADERENCIA_PDF_SECURITY, version: window.ADERENCIA_VERSION }));
+  expect(health.version).toBe('v1.0 RC50');
+  expect(health.core?.ok).toBeTruthy();
+  expect(health.final?.ok).toBeTruthy();
+  expect(health.pdf).toMatchObject({ active:true, isEvalSupported:false, enableScripting:false });
   expect(errors).toEqual([]);
 });
 
