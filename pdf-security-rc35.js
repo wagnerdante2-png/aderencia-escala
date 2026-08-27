@@ -14,6 +14,7 @@ const cache=new WeakMap();
 function normalize(src){
  const hardened={isEvalSupported:false,enableScripting:false};
  if(src instanceof ArrayBuffer||ArrayBuffer.isView(src))return Object.assign({data:src},hardened);
+ if(typeof src==='string'||src instanceof URL)return Object.assign({url:String(src)},hardened);
  if(src&&typeof src==='object')return Object.assign({},src,hardened);
  return src;
 }
