@@ -16,15 +16,20 @@ test('startup has no uncaught errors and RC50 integrity is green', async ({ page
     core: window.ADERENCIA_HEALTH,
     final: window.ADERENCIA_RC50_HEALTH,
     failed: window.ADERENCIA_RC50_HEALTH?.checks?.filter(x => !x.ok) || [],
+    runtimeFlag: window.__ADERENCIA_RUNTIME_CACHE_RC47__,
+    runtime: window.ADERENCIA_RUNTIME_CACHE,
+    pdfFlag: window.__ADERENCIA_PDF_HARDENED__,
     pdf: window.ADERENCIA_PDF_SECURITY,
     version: window.ADERENCIA_VERSION
   }));
+  console.log('RC50_PAGE_ERRORS', JSON.stringify(errors));
+  console.log('RC50_RUNTIME_DIAG', JSON.stringify({runtimeFlag:health.runtimeFlag,runtime:!!health.runtime,pdfFlag:health.pdfFlag,pdf:health.pdf||null}));
   console.log('RC50_FAILED_CHECKS', JSON.stringify(health.failed));
+  expect(errors, 'Uncaught browser errors').toEqual([]);
   expect(health.version).toBe('v1.0 RC50');
   expect(health.core?.ok).toBeTruthy();
   expect(health.final?.ok, JSON.stringify(health.failed)).toBeTruthy();
   expect(health.pdf).toMatchObject({ active:true, isEvalSupported:false, enableScripting:false });
-  expect(errors).toEqual([]);
 });
 
 test('main navigation renders every operational view', async ({ page }) => {
