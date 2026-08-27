@@ -176,6 +176,26 @@ test('history persistence survives reload', async ({ page }) => {
   expect(rows.some(r => r.store === 'ML21' && r.month === 6 && r.year === 2026 && Number(r.adherence) === 96.5)).toBeTruthy();
 });
 
+test('corrupted persisted history and store registry do not break startup', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.evaluate(() => {
+    localStorage.setItem('aderenciaHistoricoV2', '{corrompido');
+    localStorage.setItem('aderenciaStoreRegistryV1', '{corrompido');
+  });
+  await page.reload();
+  await page.waitForFunction(() => window.ADERENCIA_RC50_HEALTH);
+  const state = await page.evaluate(() => ({
+    history: window.ADERENCIA_HISTORY?.load?.(),
+    ml61: window.ADERENCIA_STORE_REGISTRY?.regionOf?.('ML61'),
+    health: window.ADERENCIA_RC50_HEALTH?.ok
+  }));
+  expect(errors).toEqual([]);
+  expect(state.history).toEqual([]);
+  expect(state.ml61).toBe('GUARDIÕES DA CHAMA');
+  expect(state.health).toBeTruthy();
+});
+
 test('divergence history keeps names and individual occurrences', async ({ page }) => {
   await page.waitForFunction(() => window.ADERENCIA_DIVERGENCE_AUDIT);
   await page.evaluate(() => {
