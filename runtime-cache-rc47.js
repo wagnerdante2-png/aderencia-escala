@@ -29,7 +29,12 @@ function xlsxOptionsKey(opts){
   for(const key of Object.keys(opts).sort()){
     const value=opts[key];
     if(value===undefined){normalized[key]='__undefined__';continue}
-    if(value===null||['string','number','boolean'].includes(typeof value)){normalized[key]=value;continue}
+    if(value===null||typeof value==='string'||typeof value==='boolean'){normalized[key]=value;continue}
+    if(typeof value==='number'){
+      if(!Number.isFinite(value))return null;
+      normalized[key]=value;
+      continue;
+    }
     return null;
   }
   try{return JSON.stringify(normalized)}catch{return null}
