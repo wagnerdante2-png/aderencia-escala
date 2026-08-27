@@ -15,26 +15,12 @@ if(window.File?.prototype?.arrayBuffer){
     return p;
   };
 }
-const pdfCache=new WeakMap();
-if(window.pdfjsLib?.getDocument){
-  const original=pdfjsLib.getDocument.bind(pdfjsLib);
-  pdfjsLib.getDocument=function(src){
-    try{
-      const data=src?.data;
-      const buffer=data instanceof ArrayBuffer?data:(ArrayBuffer.isView(data)?data.buffer:null);
-      if(buffer){
-        const cached=pdfCache.get(buffer);
-        if(cached){stats.pdfHits++;return cached}
-        stats.pdfMisses++;
-        const task=original(src);
-        pdfCache.set(buffer,task);
-        task.promise?.catch?.(()=>pdfCache.delete(buffer));
-        return task;
-      }
-    }catch(e){console.warn('RC47 PDF cache bypass:',e)}
-    return original(src);
-  };
-}
+/*
+ * RC50: o cache de documentos PDF foi movido para a camada de segurança
+ * (pdf-security-rc35.js). pdfjsLib é um namespace exportado pelo bundle do
+ * PDF.js e seu getDocument pode ser não-gravável; sobrescrevê-lo diretamente
+ * interrompia a inicialização do módulo antes da publicação desta API.
+ */
 const xlsxCache=new WeakMap();
 if(window.XLSX?.read){
   const original=XLSX.read.bind(XLSX);
@@ -55,6 +41,7 @@ if(window.XLSX?.read){
     return original(data,opts);
   };
 }
+function notePdf(hit){if(hit)stats.pdfHits++;else stats.pdfMisses++}
 function clear(){stats.clearedAt=new Date().toISOString();}
-window.ADERENCIA_RUNTIME_CACHE={version:'RC47',stats,clear};
+window.ADERENCIA_RUNTIME_CACHE={version:'RC50',stats,clear,notePdf};
 })();
