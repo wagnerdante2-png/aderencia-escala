@@ -109,12 +109,15 @@ test('divergence history keeps names and individual occurrences', async ({ page 
 
 test('recurrence identifies the same employee across two competences', async ({ page }) => {
   await page.waitForFunction(() => window.ADERENCIA_RECURRENCE?.aggregate);
-  const result = await page.evaluate(() => window.ADERENCIA_RECURRENCE.aggregate([
-    {store:'ML21',month:6,year:2026,occurrences:[{employee:'ANA TESTE',registration:'777',type:'DEVIATION'}]},
-    {store:'ML21',month:7,year:2026,occurrences:[{employee:'ANA TESTE',registration:'777',type:'NON_CONFORMITY'}]}
-  ]));
-  const person = result.people.find(p => p.registration === '777');
-  const store = result.stores.find(s => s.name === 'ML21');
-  expect(person.months.size).toBe(2);
-  expect(store.repeat.size).toBe(1);
+  const result = await page.evaluate(() => {
+    const data = window.ADERENCIA_RECURRENCE.aggregate([
+      {store:'ML21',month:6,year:2026,occurrences:[{employee:'ANA TESTE',registration:'777',type:'DEVIATION'}]},
+      {store:'ML21',month:7,year:2026,occurrences:[{employee:'ANA TESTE',registration:'777',type:'NON_CONFORMITY'}]}
+    ]);
+    const person = data.people.find(p => p.registration === '777');
+    const store = data.stores.find(s => s.name === 'ML21');
+    return { personMonths: person?.months?.size || 0, storeRepeat: store?.repeat?.size || 0 };
+  });
+  expect(result.personMonths).toBe(2);
+  expect(result.storeRepeat).toBe(1);
 });
