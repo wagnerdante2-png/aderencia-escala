@@ -32,6 +32,50 @@ test('startup has no uncaught errors and RC50 integrity is green', async ({ page
   expect(health.pdf).toMatchObject({ active:true, isEvalSupported:false, enableScripting:false });
 });
 
+test('PDF security cache keeps distinct typed-array views isolated', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const code = await fetch('/pdf-security-rc35.js').then(r => r.text());
+    const frame = document.createElement('iframe');
+    document.body.appendChild(frame);
+    const w = frame.contentWindow;
+    const calls = [];
+    w.pdfjsLib = {
+      getDocument(src) {
+        calls.push(src);
+        return { promise: new Promise(() => {}), marker: calls.length };
+      }
+    };
+    w.ADERENCIA_RUNTIME_CACHE = {
+      stats: { hits: 0, misses: 0 },
+      notePdf(hit) { if (hit) this.stats.hits++; else this.stats.misses++; }
+    };
+    w.eval(code);
+    const backing = new ArrayBuffer(8);
+    const firstView = new Uint8Array(backing, 0, 4);
+    const secondView = new Uint8Array(backing, 4, 4);
+    const first = w.ADERENCIA_PDF_OPEN(firstView);
+    const second = w.ADERENCIA_PDF_OPEN(secondView);
+    const firstAgain = w.ADERENCIA_PDF_OPEN(firstView);
+    const snapshot = {
+      distinctTasks: first !== second,
+      repeatedTask: first === firstAgain,
+      callCount: calls.length,
+      flags: calls.map(c => ({ isEvalSupported: c.isEvalSupported, enableScripting: c.enableScripting })),
+      stats: w.ADERENCIA_RUNTIME_CACHE.stats
+    };
+    frame.remove();
+    return snapshot;
+  });
+  expect(result.distinctTasks).toBeTruthy();
+  expect(result.repeatedTask).toBeTruthy();
+  expect(result.callCount).toBe(2);
+  expect(result.flags).toEqual([
+    { isEvalSupported:false, enableScripting:false },
+    { isEvalSupported:false, enableScripting:false }
+  ]);
+  expect(result.stats).toEqual({ hits:1, misses:2 });
+});
+
 test('main navigation renders every operational view', async ({ page }) => {
   await page.getByRole('button', { name: 'Histórico' }).click();
   await expect(page.locator('#historyView')).not.toHaveClass(/hidden/);
