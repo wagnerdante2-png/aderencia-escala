@@ -57,13 +57,27 @@ test('RC51 normalizer prefers validated point store over stale workbook template
   expect(result.legend).toContain('08:00');
 });
 
-test('RC51 hardening module and PDF parser are active at startup', async ({ page }) => {
+test('RC54 ML11 monthly PDF uses calendar month instead of day-number remapping', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const api=window.ADERENCIA_PDF_CALENDAR_RC54;
+    const dates=Array.from({length:30},(_,i)=>new Date(2026,5,11+i,12));
+    const aligned=api.alignRawDays(Array.from({length:31},(_,i)=>i+1),dates,'ESCALA OPERACIONAL | LOJA 11 Julho 2026');
+    return {coverage:aligned.coverage,dates:aligned.pairs.map(p=>p.date.toISOString().slice(0,10)),calendar:aligned.calendar};
+  });
+  expect(result.calendar).toMatchObject({month:6,year:2026});
+  expect(result.coverage).toBeCloseTo(10/30,5);
+  expect(result.dates[0]).toBe('2026-07-01');
+  expect(result.dates.at(-1)).toBe('2026-07-10');
+  expect(result.dates).not.toContain('2026-06-11');
+});
+
+test('RC51 hardening module and RC54 PDF parser are active at startup', async ({ page }) => {
   const state = await page.evaluate(() => ({
     hardening: window.ADERENCIA_SCHEDULE_HARDENING?.version,
     parser: window.ADERENCIA_PDF_PARSER_VERSION,
     modules: window.ADERENCIA_ACTIVE_MODULES || []
   }));
   expect(state.hardening).toMatch(/^RC51(?:\.|$)/);
-  expect(state.parser).toBe('RC28+RC51');
+  expect(state.parser).toBe('RC54');
   expect(state.modules).toContain('schedule-hardening-rc51.js');
 });
