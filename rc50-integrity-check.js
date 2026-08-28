@@ -2,7 +2,7 @@
 'use strict';
 function run(){
  const checks=[];const add=(name,ok,detail='')=>checks.push({name,ok:!!ok,detail});
- add('version',window.ADERENCIA_VERSION==='v1.0 RC50',window.ADERENCIA_VERSION||'ausente');
+ add('version',window.ADERENCIA_VERSION==='v1.0 RC51',window.ADERENCIA_VERSION||'ausente');
  const active=window.ADERENCIA_ACTIVE_MODULES||[];
  add('active-modules',Array.isArray(active)&&active.length>10,`${active.length} módulos`);
  add('no-duplicate-modules',new Set(active).size===active.length);
@@ -20,7 +20,8 @@ function run(){
  add('navigation',!!window.ADERENCIA_NAVIGATION);
  add('divergence-dashboard',!!window.ADERENCIA_DIVERGENCE_DASHBOARD);
  add('divergence-capture',!!window.__ADERENCIA_DIVERGENCE_CAPTURE_RC20__);
- add('pdf-parser',window.ADERENCIA_PDF_PARSER_VERSION==='RC28',window.ADERENCIA_PDF_PARSER_VERSION||'ausente');
+ add('schedule-hardening',window.ADERENCIA_SCHEDULE_HARDENING?.version==='RC51',window.ADERENCIA_SCHEDULE_HARDENING?.version||'ausente');
+ add('pdf-parser',window.ADERENCIA_PDF_PARSER_VERSION==='RC28+RC51',window.ADERENCIA_PDF_PARSER_VERSION||'ausente');
  add('pdf-xlsx-compat',window.ADERENCIA_PDF_XLSX_COMPAT_VERSION==='RC21',window.ADERENCIA_PDF_XLSX_COMPAT_VERSION||'ausente');
  add('recurrence',!!window.ADERENCIA_RECURRENCE);
  add('store-registry',!!window.ADERENCIA_STORE_REGISTRY);
@@ -29,7 +30,7 @@ function run(){
  try{const p=window.ADERENCIA_PERIOD?.get?.(),valid=p&&Number.isInteger(+p.month)&&+p.month>=1&&+p.month<=12&&Number.isInteger(+p.year);add('period-state',valid,p?`${p.month}/${p.year}`:'ausente')}catch(e){add('period-state',false,e.message)}
  if(window.ADERENCIA_DIVERGENCE_AUDIT)add('divergence-audit',window.ADERENCIA_DIVERGENCE_AUDIT.ok!==false,window.ADERENCIA_DIVERGENCE_AUDIT.ok===false?'inconsistências detectadas':'ok');
  const ok=checks.every(x=>x.ok);window.ADERENCIA_RC50_HEALTH={ok,checks,cacheStats:window.ADERENCIA_RUNTIME_CACHE?.stats||null,ocr:window.ADERENCIA_OCR_LAZY||null,checkedAt:new Date().toISOString()};
- if(!ok)console.warn('RC50 integrity issues',checks.filter(x=>!x.ok));else console.info('RC50 integrity OK');
+ if(!ok)console.warn('RC51 integrity issues',checks.filter(x=>!x.ok));else console.info('RC51 integrity OK');
  return window.ADERENCIA_RC50_HEALTH;
 }
 const schedule=()=>setTimeout(run,1200);
