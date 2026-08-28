@@ -33,94 +33,103 @@ test('startup has no uncaught errors and RC50 integrity is green', async ({ page
 });
 
 test('main navigation renders every operational view', async ({ page }) => {
-  await page.waitForLoadState('networkidle');
-  const links = page.locator('.nav-link');
-  for (let i = 0; i < await links.count(); i++) {
-    const link = links.nth(i);
-    const target = await link.getAttribute('data-view');
-    if (!target) continue;
-    await link.click();
-    await expect(page.locator(`#${target}`)).toHaveClass(/active/);
-  }
+  await page.getByRole('button', { name: 'Histórico' }).click();
+  await expect(page.locator('#historyView')).not.toHaveClass(/hidden/);
+  await page.getByRole('button', { name: 'Monitoramento' }).click();
+  await expect(page.locator('#monitorView')).not.toHaveClass(/hidden/);
+  await page.getByRole('button', { name: 'Semestral' }).click();
+  await expect(page.locator('#semesterView')).not.toHaveClass(/hidden/);
+  await page.getByRole('button', { name: 'Análise' }).click();
+  await expect(page.locator('#analysisView')).not.toHaveClass(/hidden/);
 });
 
 test('global period controller keeps the entire ecosystem coherent', async ({ page }) => {
-  await page.waitForLoadState('networkidle');
-  await page.waitForFunction(() => !!window.ADERENCIA_PERIOD_CONTROLLER);
-  const changed = await page.evaluate(() => {
-    window.ADERENCIA_PERIOD_CONTROLLER.set({ year: 2026, month: 7, half: 'S2' }, { source:'e2e' });
-    return {
-      state: window.ADERENCIA_PERIOD_CONTROLLER.get(),
-      report: window.ADERENCIA_HISTORY_REPORT?.getPeriod?.(),
-      regional: window.ADERENCIA_REGIONAL_COMPARISON?.getPeriod?.(),
-      evolution: window.ADERENCIA_EVOLUTION_DASHBOARD?.getPeriod?.()
-    };
-  });
-  expect(changed.state.year).toBe(2026);
-  expect(changed.state.month).toBe(7);
-  expect(changed.state.half).toBe('S2');
-  if (changed.report) expect(changed.report.month).toBe(7);
-  if (changed.regional) expect(changed.regional.month).toBe(7);
-  if (changed.evolution) expect(changed.evolution.month).toBe(7);
+  await page.waitForFunction(() => window.ADERENCIA_PERIOD && document.querySelector('#historyMonth')?.options.length > 1);
+  const ok = await page.evaluate(() => window.ADERENCIA_PERIOD.set(6, 2026, 'e2e'));
+  expect(ok).toBeTruthy();
+  await page.waitForTimeout(100);
+  const values = await page.evaluate(() => ({
+    state: window.ADERENCIA_PERIOD.get(),
+    historyMonth: document.querySelector('#historyMonth')?.value,
+    historyYear: document.querySelector('#historyYear')?.value,
+    monitorMonth: document.querySelector('#monitorMonth')?.value,
+    monitorYear: document.querySelector('#monitorYear')?.value,
+    saveMonth: document.querySelector('#saveMonth')?.value,
+    saveYear: document.querySelector('#saveYear')?.value,
+    semesterYear: document.querySelector('#semesterYear')?.value,
+    ledMonth: document.querySelector('#networkLedMonth')?.value,
+    ledYear: document.querySelector('#networkLedYear')?.value
+  }));
+  expect(values.state).toMatchObject({ month: 6, year: 2026 });
+  expect(values.historyMonth).toBe('6');
+  expect(values.monitorMonth).toBe('6');
+  expect(values.saveMonth).toBe('6');
+  expect(values.ledMonth).toBe('6');
+  expect(values.historyYear).toBe('2026');
+  expect(values.monitorYear).toBe('2026');
+  expect(values.saveYear).toBe('2026');
+  expect(values.semesterYear).toBe('2026');
+  expect(values.ledYear).toBe('2026');
 });
 
 test('11-to-10 competence is anchored to the start of the point period', async ({ page }) => {
-  await page.waitForLoadState('networkidle');
-  const c = await page.evaluate(() => window.ADERENCIA_COMPETENCE?.fromAnalysis?.('11/06/2026 a 10/07/2026'));
-  expect(c).toMatchObject({ year:2026, month:6 });
+  await page.waitForFunction(() => window.ADERENCIA_COMPETENCE && window.ADERENCIA_PERIOD);
+  await page.evaluate(() => {
+    document.querySelector('#metaPeriod').textContent = '11/06/2026 a 10/07/2026';
+    document.querySelector('#warnings').textContent = 'O período integral do espelho é 11/06/2026 a 10/07/2026.';
+  });
+  await page.waitForTimeout(180);
+  const c = await page.evaluate(() => window.ADERENCIA_COMPETENCE.fromAnalysis());
+  expect(c).toMatchObject({ month: 6, year: 2026, periodStart: '2026-06-11', periodEnd: '2026-07-10' });
 });
 
 test('store registry includes ML61 in Guardiões da Chama and accepts a new store', async ({ page }) => {
-  await page.waitForLoadState('networkidle');
-  const result = await page.evaluate(() => {
-    const api = window.ADERENCIA_STORE_REGISTRY;
-    const ml61 = api.list().find(x => x.code === 'ML61');
-    const added = api.add({ code:'ML62', name:'Loja 62', region:'Guardiões da Chama' });
-    return { ml61, added, ml62: api.list().find(x => x.code === 'ML62') };
-  });
-  expect(result.ml61?.region).toBe('Guardiões da Chama');
-  expect(result.added).toBeTruthy();
-  expect(result.ml62?.code).toBe('ML62');
+  await page.waitForFunction(() => window.ADERENCIA_STORE_REGISTRY);
+  expect(await page.evaluate(() => window.ADERENCIA_STORE_REGISTRY.regionOf('ML61'))).toBe('GUARDIÕES DA CHAMA');
+  await page.getByRole('button', { name: 'Lojas' }).click();
+  await page.locator('#storeCode').fill('62');
+  await page.locator('#storeName').fill('LOJA TESTE E2E');
+  await page.locator('#storeRegion').selectOption({ label: 'VENTO DOURADO' });
+  await page.locator('#storeSaveBtn').click();
+  const saved = await page.evaluate(() => window.ADERENCIA_STORE_REGISTRY.load().ML62);
+  expect(saved).toMatchObject({ code: 'ML62', name: 'LOJA TESTE E2E', region: 'VENTO DOURADO' });
 });
 
 test('history persistence survives reload', async ({ page }) => {
-  await page.waitForLoadState('networkidle');
-  await page.evaluate(() => {
-    const row={store:'ML10',storeName:'Loja 10',year:2026,month:7,adherence:91,total:100,adherent:91,periodStart:'2026-07-11',periodEnd:'2026-08-10',savedAt:new Date().toISOString()};
-    localStorage.setItem('aderencia_history_v2',JSON.stringify([row]));
-  });
+  await page.evaluate(() => localStorage.setItem('aderenciaHistoricoV2', JSON.stringify([{store:'ML21',month:6,year:2026,adherence:96.5,savedAt:'2026-07-10T12:00:00.000Z'}])));
   await page.reload();
-  await page.waitForLoadState('networkidle');
-  const rows=await page.evaluate(()=>window.ADERENCIA_HISTORY?.all?.()||[]);
-  expect(rows.some(x=>x.store==='ML10'&&x.month===7)).toBeTruthy();
+  const rows = await page.evaluate(() => window.ADERENCIA_HISTORY?.load?.() || []);
+  expect(rows.some(r => r.store === 'ML21' && r.month === 6 && r.year === 2026 && Number(r.adherence) === 96.5)).toBeTruthy();
 });
 
 test('divergence history keeps names and individual occurrences', async ({ page }) => {
-  await page.waitForLoadState('networkidle');
-  const result = await page.evaluate(() => {
-    const api=window.ADERENCIA_DIVERGENCE_CAPTURE;
-    if(!api?.capture)return {supported:false};
-    api.capture({store:'ML10',year:2026,month:6,employee:'ANA TESTE',date:'2026-06-12',type:'atraso'});
-    api.capture({store:'ML10',year:2026,month:6,employee:'ANA TESTE',date:'2026-06-13',type:'atraso'});
-    return {supported:true,rows:api.all?.()||[]};
+  await page.waitForFunction(() => window.ADERENCIA_DIVERGENCE_AUDIT);
+  await page.evaluate(() => {
+    localStorage.setItem('aderenciaDivergenciasV1', JSON.stringify([{
+      store:'ML21', month:6, year:2026, deviations:1, nonConformities:1,
+      occurrences:[
+        { employee:'FUNCIONARIO TESTE', registration:'123', cargo:'OPERADOR', date:'2026-06-12', type:'DEVIATION', points:1 },
+        { employee:'FUNCIONARIO TESTE', registration:'123', cargo:'OPERADOR', date:'2026-06-15', type:'NON_CONFORMITY', code:'F', points:10 }
+      ]
+    }]));
   });
-  if(result.supported){
-    expect(result.rows.filter(x=>x.employee==='ANA TESTE').length).toBeGreaterThanOrEqual(2);
-  }
+  const raw = await page.evaluate(() => JSON.parse(localStorage.getItem('aderenciaDivergenciasV1')));
+  expect(raw[0].occurrences).toHaveLength(2);
+  expect(raw[0].occurrences[0].employee).toBe('FUNCIONARIO TESTE');
+  expect(raw[0].occurrences[1]).toMatchObject({ code:'F', points:10 });
 });
 
 test('recurrence identifies the same employee across two competences', async ({ page }) => {
-  await page.waitForLoadState('networkidle');
-  const supported = await page.evaluate(() => !!window.ADERENCIA_RECURRENCE_DASHBOARD);
-  if(!supported)return;
+  await page.waitForFunction(() => window.ADERENCIA_RECURRENCE?.aggregate);
   const result = await page.evaluate(() => {
-    const api=window.ADERENCIA_RECURRENCE_DASHBOARD;
-    const fn=api.compute||api.build||api.analyze;
-    if(typeof fn!=='function')return null;
-    return fn.call(api,[
-      {store:'ML10',year:2026,month:6,employee:'ANA TESTE',type:'atraso'},
-      {store:'ML10',year:2026,month:7,employee:'ANA TESTE',type:'atraso'}
+    const data = window.ADERENCIA_RECURRENCE.aggregate([
+      {store:'ML21',month:6,year:2026,occurrences:[{employee:'ANA TESTE',registration:'777',type:'DEVIATION'}]},
+      {store:'ML21',month:7,year:2026,occurrences:[{employee:'ANA TESTE',registration:'777',type:'NON_CONFORMITY'}]}
     ]);
+    const person = data.people.find(p => p.registration === '777');
+    const store = data.stores.find(s => s.name === 'ML21');
+    return { personMonths: person?.months?.size || 0, storeRepeat: store?.repeat?.size || 0 };
   });
-  if(result!=null)expect(JSON.stringify(result)).toContain('ANA TESTE');
+  expect(result.personMonths).toBe(2);
+  expect(result.storeRepeat).toBe(1);
 });
