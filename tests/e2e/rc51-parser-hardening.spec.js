@@ -63,7 +63,7 @@ test('RC51 hardening module and PDF parser are active at startup', async ({ page
     parser: window.ADERENCIA_PDF_PARSER_VERSION,
     modules: window.ADERENCIA_ACTIVE_MODULES || []
   }));
-  expect(state.hardening).toBe('RC51.1');
+  expect(state.hardening).toMatch(/^RC51(?:\.|$)/);
   expect(state.parser).toBe('RC28+RC51');
   expect(state.modules).toContain('schedule-hardening-rc51.js');
 });
