@@ -25,6 +25,17 @@ test('RC52 preprocesses an ML08 workbook before residual ML01 template metadata 
   });
   const bytes=Buffer.from(file);
   await page.setInputFiles('#scheduleFile',{name:'Escala - Novo Modelo - 1.2 ML08.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:bytes});
+  await page.waitForFunction(() => !!window.ADERENCIA_SCHEDULE_PREPROCESS.last,{timeout:15000});
+  const diagnostic=await page.evaluate(async()=>{
+    const f=document.getElementById('scheduleFile').files?.[0];
+    let workbook=null;
+    if(f){
+      const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});
+      workbook={name:f.name,sheets:wb.SheetNames,heads:wb.SheetNames.map(n=>({sheet:n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:'',raw:false}).slice(0,5)}))};
+    }
+    return {pre:window.ADERENCIA_SCHEDULE_PREPROCESS.last,hard:window.ADERENCIA_SCHEDULE_HARDENING.lastAudit,status:document.getElementById('scheduleStatus').textContent,workbook};
+  });
+  console.log('RC52_DIAGNOSTIC',JSON.stringify(diagnostic));
   await expect(page.locator('#scheduleStatus')).toContainText(/Reconhecida: 5 funcionário\(s\).*ML08/i,{timeout:15000});
   const audit=await page.evaluate(()=>({pre:window.ADERENCIA_SCHEDULE_PREPROCESS.last,hard:window.ADERENCIA_SCHEDULE_HARDENING.lastAudit,name:document.getElementById('scheduleFile').files?.[0]?.name}));
   expect(audit.pre.mode).toBe('normalized');
