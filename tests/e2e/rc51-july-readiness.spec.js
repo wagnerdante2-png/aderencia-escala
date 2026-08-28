@@ -80,7 +80,7 @@ test('July gate: validated 31-day matrix with complete legend normalizes safely'
     const normalized=await window.ADERENCIA_SCHEDULE_HARDENING.normalizeExcel(file,{store:'ML10',start:'2026-07-11',end:'2026-08-10'});
     return {name:normalized.name,audit:window.ADERENCIA_SCHEDULE_HARDENING.lastAudit,version:window.ADERENCIA_SCHEDULE_HARDENING.version};
   });
-  expect(result.version).toBe('RC51.3');
+  expect(result.version).toBe('RC51.4');
   expect(result.name).toContain('RC51_ML10_');
   expect(result.audit.coverage).toBe(1);
   expect(result.audit.employees).toBe(5);
