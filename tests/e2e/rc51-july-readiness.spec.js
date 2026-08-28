@@ -64,7 +64,7 @@ test('July gate: fallback rejects a partial 20-day grid for a 31-day competence'
     catch(e){ return String(e.message); }
     return '';
   });
-  expect(message).toMatch(/nenhuma matriz alternativa segura|cobertura de datas insuficiente|cobertura exata da escala insuficiente|cobertura de colaboradores insuficiente/i);
+  expect(message).toMatch(/nenhuma matriz alternativa segura|cobertura de datas insuficiente|cobertura exata da escala insuficiente|cobertura de colaboradores insuficiente|escala reconhecida por nomes.*faltam \d+ dia\(s\).*dias ausentes não são inferidos/i);
 });
 
 test('July gate: validated 31-day matrix with complete legend normalizes safely', async ({ page }) => {
