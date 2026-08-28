@@ -15,6 +15,17 @@ test('RC51 point context reuses already validated store and competence', async (
   expect(await page.evaluate(() => window.ADERENCIA_POINT_CONTEXT)).toEqual(ctx);
 });
 
+test('RC51 clears stale point context while a new point file is still loading', async ({ page }) => {
+  const ctx = await page.evaluate(() => {
+    window.ADERENCIA_POINT_CONTEXT = { store:'ML08', start:'2026-06-11', end:'2026-07-10' };
+    document.querySelector('#metaPeriod').textContent = '11/06/2026 a 10/07/2026';
+    document.querySelector('#pointStatus').textContent = 'Lendo espelho...';
+    return window.ADERENCIA_SCHEDULE_HARDENING.pointContext();
+  });
+  expect(ctx).toEqual({ store:null, start:null, end:null });
+  expect(await page.evaluate(() => window.ADERENCIA_POINT_CONTEXT)).toEqual(ctx);
+});
+
 test('RC51 normalizer prefers validated point store over stale workbook template code', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const dates = Array.from({ length: 30 }, (_, i) => {
@@ -52,7 +63,7 @@ test('RC51 hardening module and PDF parser are active at startup', async ({ page
     parser: window.ADERENCIA_PDF_PARSER_VERSION,
     modules: window.ADERENCIA_ACTIVE_MODULES || []
   }));
-  expect(state.hardening).toBe('RC51');
+  expect(state.hardening).toBe('RC51.1');
   expect(state.parser).toBe('RC28+RC51');
   expect(state.modules).toContain('schedule-hardening-rc51.js');
 });
