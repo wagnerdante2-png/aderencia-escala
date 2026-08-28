@@ -20,7 +20,7 @@ function run(){
  add('navigation',!!window.ADERENCIA_NAVIGATION);
  add('divergence-dashboard',!!window.ADERENCIA_DIVERGENCE_DASHBOARD);
  add('divergence-capture',!!window.__ADERENCIA_DIVERGENCE_CAPTURE_RC20__);
- add('schedule-hardening',window.ADERENCIA_SCHEDULE_HARDENING?.version==='RC51',window.ADERENCIA_SCHEDULE_HARDENING?.version||'ausente');
+ add('schedule-hardening',/^RC51(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_HARDENING?.version||''),window.ADERENCIA_SCHEDULE_HARDENING?.version||'ausente');
  add('pdf-parser',window.ADERENCIA_PDF_PARSER_VERSION==='RC28+RC51',window.ADERENCIA_PDF_PARSER_VERSION||'ausente');
  add('pdf-xlsx-compat',window.ADERENCIA_PDF_XLSX_COMPAT_VERSION==='RC21',window.ADERENCIA_PDF_XLSX_COMPAT_VERSION||'ausente');
  add('recurrence',!!window.ADERENCIA_RECURRENCE);
