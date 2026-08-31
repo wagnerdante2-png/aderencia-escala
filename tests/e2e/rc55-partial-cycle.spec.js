@@ -44,7 +44,7 @@ test('RC55 accepts exact partial intersection 11/07-31/07 for a 11/07-10/08 poin
   expect(result.audit.coverage).toBe(1);
 });
 
-test('RC55 still blocks an internal calendar hole inside a partial interval', async ({ page }) => {
+test('RC55 still blocks a perforated or insufficient partial interval instead of inferring dates', async ({ page }) => {
   await openApp(page);
   const result=await page.evaluate(async ({rows})=>{
     document.getElementById('pointStatus').textContent='Reconhecido: 21 funcionário(s) • ML10 • 1514 marcações';
@@ -54,5 +54,5 @@ test('RC55 still blocks an internal calendar hole inside a partial interval', as
     const file=new File([XLSX.write(wb,{bookType:'xlsm',type:'array'})],'Escala ML10.xlsm');
     try{await window.ADERENCIA_SCHEDULE_HARDENING.normalizeExcel(file,{store:'ML10',start:'2026-07-11',end:'2026-08-10'});return{message:''}}catch(e){return{message:String(e.message)}}
   },{rows:julyLayout()});
-  expect(result.message).toContain('lacuna interna');
+  expect(result.message).toMatch(/lacuna interna|curta demais/);
 });
