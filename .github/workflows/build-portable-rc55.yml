@@ -1,0 +1,197 @@
+name: Build Portable RC55
+
+on:
+  push:
+    branches:
+      - fix-partial-cycle-rc55-20260831
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-portable:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact repository state
+        uses: actions/checkout@v4
+
+      - name: Prepare transparent portable package
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG="dist/Aderencia_Escala_RC55_Portable_Windows"
+          rm -rf dist
+          mkdir -p "$PKG/vendor"
+
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='tests' \
+            --exclude='node_modules' \
+            --exclude='package.json' \
+            --exclude='package-lock.json' \
+            ./ "$PKG/"
+
+          curl --fail --location --retry 3 \
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js' \
+            --output "$PKG/vendor/pdf.min.js"
+          curl --fail --location --retry 3 \
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js' \
+            --output "$PKG/vendor/pdf.worker.min.js"
+          curl --fail --location --retry 3 \
+            'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js' \
+            --output "$PKG/vendor/xlsx.full.min.js"
+          curl --fail --location --retry 3 \
+            'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js' \
+            --output "$PKG/vendor/jspdf.umd.min.js"
+          curl --fail --location --retry 3 \
+            'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js' \
+            --output "$PKG/vendor/tesseract.min.js"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('dist/Aderencia_Escala_RC55_Portable_Windows')
+          replacements = {
+              'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js': 'vendor/pdf.min.js',
+              'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js': 'vendor/pdf.worker.min.js',
+              'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js': 'vendor/xlsx.full.min.js',
+              'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js': 'vendor/jspdf.umd.min.js',
+              'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js': 'vendor/tesseract.min.js',
+              'Este pacote usa bibliotecas online; verifique a conexão e reabra o index.html.': 'Falha ao carregar bibliotecas locais do pacote. Extraia novamente o ZIP completo e reabra o index.html.',
+          }
+          for path in list(root.rglob('*.html')) + list(root.rglob('*.js')):
+              text = path.read_text(encoding='utf-8')
+              new = text
+              for old, repl in replacements.items():
+                  new = new.replace(old, repl)
+              if new != text:
+                  path.write_text(new, encoding='utf-8', newline='\n')
+          PY
+
+          cat > "$PKG/INSTRUCOES_PORTABLE.txt" <<EOF
+          ADERENCIA DE ESCALA — RC55 — PACOTE PORTATIL WINDOWS
+
+          COMO ABRIR
+          1. Extraia TODO o arquivo ZIP para uma pasta normal do Windows.
+          2. Abra o arquivo index.html com duplo clique.
+          3. Use preferencialmente Microsoft Edge ou Google Chrome atualizado.
+
+          CARACTERISTICAS DESTE PACOTE
+          - Nao possui instalador.
+          - Nao possui arquivo .EXE.
+          - Nao possui .DLL, .MSI, .BAT, .CMD, .PS1, .VBS, .SCR ou .COM.
+          - Nao extrai arquivos para pastas temporarias quando e aberto.
+          - Nao altera registro do Windows.
+          - Nao cria servicos, tarefas agendadas ou processos auxiliares.
+          - PDF.js, SheetJS e jsPDF estao incluidos localmente no pacote.
+          - Tesseract.js tambem e carregado localmente. Em um uso raro do OCR, componentes auxiliares do motor OCR ainda podem requerer internet.
+          - Os PDFs e planilhas analisados continuam sendo processados no navegador localmente.
+          - RC55 aceita intersecoes parciais seguras entre o ciclo do espelho e a escala mensal, sem inventar datas ausentes.
+
+          IMPORTANTE
+          Nao adicione excecao global no antivirus apenas para abrir este pacote. Se o antivirus bloquear algum arquivo, consulte o nome exato detectado antes de liberar.
+
+          ORIGEM
+          Repositorio: wagnerdante2-png/aderencia-escala
+          Codigo-base RC55: ${GITHUB_SHA}
+          EOF
+
+          find "$PKG" -type f \( \
+            -iname '*.exe' -o -iname '*.dll' -o -iname '*.msi' -o \
+            -iname '*.bat' -o -iname '*.cmd' -o -iname '*.ps1' -o \
+            -iname '*.vbs' -o -iname '*.scr' -o -iname '*.com' \
+          \) -delete
+
+      - name: Verify package integrity and transparency
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG="dist/Aderencia_Escala_RC55_Portable_Windows"
+
+          test -s "$PKG/index.html"
+          test -s "$PKG/bootstrap.js"
+          test -s "$PKG/engine-v3.js"
+          test -s "$PKG/styles.css"
+          test -s "$PKG/schedule-partial-cycle-rc55.js"
+          test -s "$PKG/vendor/pdf.min.js"
+          test -s "$PKG/vendor/pdf.worker.min.js"
+          test -s "$PKG/vendor/xlsx.full.min.js"
+          test -s "$PKG/vendor/jspdf.umd.min.js"
+          test -s "$PKG/vendor/tesseract.min.js"
+
+          if find "$PKG" -type f | grep -Eiq '\.(exe|dll|msi|bat|cmd|ps1|vbs|scr|com)$'; then
+            echo 'ERRO: arquivo executavel ou launcher encontrado no pacote.'
+            exit 1
+          fi
+
+          if grep -RInE \
+            --include='*.html' --include='*.js' \
+            'cdnjs\.cloudflare\.com/ajax/libs/pdf\.js/3\.11\.174/pdf\.min\.js|cdn\.jsdelivr\.net/npm/xlsx@0\.18\.5/dist/xlsx\.full\.min\.js|cdnjs\.cloudflare\.com/ajax/libs/jspdf/2\.5\.1/jspdf\.umd\.min\.js|cdn\.jsdelivr\.net/npm/tesseract\.js@5/dist/tesseract\.min\.js' \
+            "$PKG"; then
+            echo 'ERRO: referencia CDN essencial ainda presente no runtime.'
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('dist/Aderencia_Escala_RC55_Portable_Windows')
+          bootstrap = (root / 'bootstrap.js').read_text(encoding='utf-8')
+          if "window.ADERENCIA_VERSION='v1.0 RC55'" not in bootstrap:
+              raise SystemExit('Versao RC55 nao localizada no bootstrap.js')
+          active_match = re.search(r"const ACTIVE=\[(.*?)\];", bootstrap, re.S)
+          if not active_match:
+              raise SystemExit('Lista ACTIVE nao localizada no bootstrap.js')
+          files = re.findall(r"'([^']+\.js)'", active_match.group(1))
+          missing = [name for name in files if not (root / name).is_file()]
+          if missing:
+              raise SystemExit('Modulos ACTIVE ausentes: ' + ', '.join(missing))
+          if 'schedule-partial-cycle-rc55.js' not in files:
+              raise SystemExit('Modulo RC55 nao esta ativo no bootstrap.js')
+
+          index = (root / 'index.html').read_text(encoding='utf-8')
+          refs = re.findall(r'''(?:src|href)=["']([^"']+)["']''', index)
+          missing_refs = []
+          for ref in refs:
+              if ref.startswith(('http://', 'https://', '#', 'data:')):
+                  continue
+              target = root / ref.split('?',1)[0].split('#',1)[0]
+              if not target.exists():
+                  missing_refs.append(ref)
+          if missing_refs:
+              raise SystemExit('Referencias locais ausentes no index.html: ' + ', '.join(missing_refs))
+          print(f'ACTIVE modules OK: {len(files)}')
+          print(f'Index local refs OK: {len(refs)}')
+          PY
+
+          {
+            echo 'ADERENCIA DE ESCALA RC55 - MANIFESTO SHA-256'
+            echo "Codigo-base: ${GITHUB_SHA}"
+            echo
+            find "$PKG" -type f ! -name 'MANIFEST_SHA256.txt' -print0 | sort -z | xargs -0 sha256sum
+          } > "$PKG/MANIFEST_SHA256.txt"
+
+          echo "Quantidade de arquivos: $(find "$PKG" -type f | wc -l)"
+          du -sh "$PKG"
+
+      - name: Create Windows-compatible ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          zip -r -9 Aderencia_Escala_RC55_Portable_Windows.zip Aderencia_Escala_RC55_Portable_Windows
+          sha256sum Aderencia_Escala_RC55_Portable_Windows.zip > Aderencia_Escala_RC55_Portable_Windows.zip.sha256.txt
+
+      - name: Upload portable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aderencia_Escala_RC55_Portable_Windows
+          path: |
+            dist/Aderencia_Escala_RC55_Portable_Windows.zip
+            dist/Aderencia_Escala_RC55_Portable_Windows.zip.sha256.txt
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
