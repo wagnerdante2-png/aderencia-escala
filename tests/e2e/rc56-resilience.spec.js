@@ -38,17 +38,20 @@ test('calendário PDF mensal de julho produz interseção proporcional 21 de 31 
   expect(out).toEqual({ pairs: 21, computedDays: 21, expectedDays: 31, proportional: true });
 });
 
-test('bootstrap mantém recuperação Excel RC56 e ativa parser PDF RC57', async ({ page }) => {
+test('bootstrap mantém recuperação Excel RC56 e ativa parser PDF RC58 com aliases legados', async ({ page }) => {
   const state = await page.evaluate(() => ({
     active: window.ADERENCIA_ACTIVE_MODULES.slice(),
     schedule: window.ADERENCIA_SCHEDULE_RESILIENCE?.version,
     parser: window.ADERENCIA_PDF_PARSER_VERSION,
-    alias: window.ADERENCIA_PDF_CALENDAR_RC56 === window.ADERENCIA_PDF_CALENDAR_RC57
+    alias: window.ADERENCIA_PDF_CALENDAR_RC56 === window.ADERENCIA_PDF_CALENDAR_RC57,
+    proportionalPolicy: typeof window.ADERENCIA_PDF_CALENDAR_RC56?.proportionalPolicy
   }));
   expect(state.active).toContain('schedule-resilience-rc56.js');
-  expect(state.active).toContain('pdf-schedule-parser-rc57.js');
+  expect(state.active).toContain('pdf-schedule-parser-rc58.js');
+  expect(state.active).toContain('pdf-calendar-compat-rc58.js');
   expect(state.active).not.toContain('pdf-schedule-parser-rc28.js');
   expect(state.schedule).toBe('RC56.1');
-  expect(state.parser).toBe('RC57');
+  expect(state.parser).toBe('RC58');
   expect(state.alias).toBeTruthy();
+  expect(state.proportionalPolicy).toBe('function');
 });
