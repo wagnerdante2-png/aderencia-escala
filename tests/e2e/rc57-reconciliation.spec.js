@@ -75,7 +75,7 @@ test('RC57 finds the employee column from point names even without a Nome header
   expect(result.audit.exactDateDays).toBe(21);
 });
 
-test('RC57 multipage merge keeps employees and dates from every PDF page slice', async ({ page }) => {
+test('RC57 multipage merge remains available as a compatibility alias under the RC58 parser', async ({ page }) => {
   const result = await page.evaluate(() => {
     const merge = window.ADERENCIA_PDF_CALENDAR_RC57.mergeEmployeeSlices;
     const slices = [
@@ -98,7 +98,7 @@ test('RC57 multipage merge keeps employees and dates from every PDF page slice',
   ]);
   expect(result.bruno).toEqual([['2026-07-11','T2']]);
   expect(result.alias).toBeTruthy();
-  expect(result.parser).toBe('RC57');
+  expect(result.parser).toBe('RC58');
 });
 
 test('RC57 accepts embedded shift text without inventing missing times', async ({ page }) => {
