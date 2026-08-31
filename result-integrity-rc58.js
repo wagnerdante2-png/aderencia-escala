@@ -1,0 +1,9 @@
+(function(){
+'use strict';
+if(window.__ADERENCIA_RESULT_INTEGRITY_RC58__)return;
+window.__ADERENCIA_RESULT_INTEGRITY_RC58__=true;
+function suspicious(x){if(!x||x.adherence!==0||!x.total||!x.matched)return false;return Number(x.structCoverage)<.20||x.total<Math.max(12,x.matched*1.5)}
+function apply(){const x=window.ADERENCIA_LAST_CALCULATION;if(!suspicious(x))return false;const result=document.getElementById('resultPercent'),warnings=document.getElementById('warnings'),cause=document.getElementById('causeSummary');if(result)result.textContent='REVISAR';if(warnings)warnings.insertAdjacentHTML('afterbegin',`<div><strong>RC58:</strong> percentual de 0% não foi publicado porque a amostra estrutural é incompatível com um cálculo confiável (${(100*(x.structCoverage||0)).toFixed(1).replace('.',',')}% de cobertura; ${x.total} marcações comparáveis). A escala deve ser reprocessada pelo parser resiliente.</div>`);if(cause)cause.insertAdjacentHTML('afterbegin',`<div class="cause-item critical"><strong>Resultado suprimido por integridade</strong><span>O motor detectou um 0% produzido sobre amostra estrutural anormalmente pequena. O dado não será tratado como aderência real.</span></div>`);x.invalid=true;x.invalidReason='sparse-structural-sample';x.adherence=null;document.getElementById('saveHistoryBtn')?.setAttribute('disabled','disabled');document.getElementById('exportPdfBtn')?.setAttribute('disabled','disabled');return true}
+const target=document.getElementById('resultPercent');if(target)new MutationObserver(()=>setTimeout(apply,0)).observe(target,{childList:true,characterData:true,subtree:true});
+window.ADERENCIA_RESULT_SANITY_RC58={version:'RC58.1',suspicious,apply};
+})();
