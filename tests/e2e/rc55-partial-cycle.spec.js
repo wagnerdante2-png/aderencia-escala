@@ -44,6 +44,32 @@ test('RC55 accepts exact partial intersection 11/07-31/07 for a 11/07-10/08 poin
   expect(result.audit.coverage).toBe(1);
 });
 
+test('RC55 PDF parser applies proportionality instead of blocking 68% calendar overlap', async ({ page }) => {
+  await openApp(page);
+  const result=await page.evaluate(() => {
+    const api=window.ADERENCIA_PDF_CALENDAR_RC54;
+    const pointCycle=Array.from({length:31},(_,i)=>new Date(2026,6,11+i,12));
+    const aligned=api.alignRawDays(Array.from({length:31},(_,i)=>i+1),pointCycle,'ESCALA OPERACIONAL | LOJA 12 Julho 2026');
+    const policy=api.proportionalPolicy(aligned,pointCycle.length);
+    return {
+      computedDays:policy.computedDays,
+      expectedDays:policy.expectedDays,
+      proportional:policy.proportional,
+      accepted:policy.accepted,
+      coverage:policy.coverage,
+      first:aligned.pairs[0]?.date?.toISOString().slice(0,10),
+      last:aligned.pairs.at(-1)?.date?.toISOString().slice(0,10)
+    };
+  });
+  expect(result.accepted).toBeTruthy();
+  expect(result.proportional).toBeTruthy();
+  expect(result.computedDays).toBe(21);
+  expect(result.expectedDays).toBe(31);
+  expect(result.coverage).toBeCloseTo(21/31,5);
+  expect(result.first).toBe('2026-07-11');
+  expect(result.last).toBe('2026-07-31');
+});
+
 test('RC55 still blocks a perforated or insufficient partial interval instead of inferring dates', async ({ page }) => {
   await openApp(page);
   const result=await page.evaluate(async ({rows})=>{
