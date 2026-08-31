@@ -2,7 +2,7 @@
 'use strict';
 function run(){
  const checks=[];const add=(name,ok,detail='')=>checks.push({name,ok:!!ok,detail});
- add('version',/^v1\.0 RC5[1235]$/.test(window.ADERENCIA_VERSION||''),window.ADERENCIA_VERSION||'ausente');
+ add('version',/^v1\.0 RC(?:51|52|53|55|57)$/.test(window.ADERENCIA_VERSION||''),window.ADERENCIA_VERSION||'ausente');
  const active=window.ADERENCIA_ACTIVE_MODULES||[];
  add('active-modules',Array.isArray(active)&&active.length>10,`${active.length} módulos`);
  add('no-duplicate-modules',new Set(active).size===active.length);
@@ -24,8 +24,10 @@ function run(){
  add('schedule-monthly-bridge',/^RC53(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_BRIDGE?.version||''),window.ADERENCIA_SCHEDULE_BRIDGE?.version||'ausente');
  add('schedule-partial-cycle',/^RC55(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_PARTIAL?.version||''),window.ADERENCIA_SCHEDULE_PARTIAL?.version||'ausente');
  add('schedule-resilience',/^RC56(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_RESILIENCE?.version||''),window.ADERENCIA_SCHEDULE_RESILIENCE?.version||'ausente');
+ add('schedule-reconciliation',/^RC57(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_RECONCILIATION?.version||''),window.ADERENCIA_SCHEDULE_RECONCILIATION?.version||'ausente');
  add('schedule-preprocess',/^RC52(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_PREPROCESS?.version||''),window.ADERENCIA_SCHEDULE_PREPROCESS?.version||'ausente');
- add('pdf-parser',/^(?:RC28\+RC51|RC54|RC56)$/.test(window.ADERENCIA_PDF_PARSER_VERSION||''),window.ADERENCIA_PDF_PARSER_VERSION||'ausente');
+ add('pdf-parser',/^(?:RC28\+RC51|RC54|RC56|RC57)$/.test(window.ADERENCIA_PDF_PARSER_VERSION||''),window.ADERENCIA_PDF_PARSER_VERSION||'ausente');
+ add('pdf-calendar-api',!!window.ADERENCIA_PDF_CALENDAR_RC57);
  add('pdf-xlsx-compat',window.ADERENCIA_PDF_XLSX_COMPAT_VERSION==='RC21',window.ADERENCIA_PDF_XLSX_COMPAT_VERSION||'ausente');
  add('recurrence',!!window.ADERENCIA_RECURRENCE);
  add('store-registry',!!window.ADERENCIA_STORE_REGISTRY);
@@ -34,7 +36,7 @@ function run(){
  try{const p=window.ADERENCIA_PERIOD?.get?.(),valid=p&&Number.isInteger(+p.month)&&+p.month>=1&&+p.month<=12&&Number.isInteger(+p.year);add('period-state',valid,p?`${p.month}/${p.year}`:'ausente')}catch(e){add('period-state',false,e.message)}
  if(window.ADERENCIA_DIVERGENCE_AUDIT)add('divergence-audit',window.ADERENCIA_DIVERGENCE_AUDIT.ok!==false,window.ADERENCIA_DIVERGENCE_AUDIT.ok===false?'inconsistências detectadas':'ok');
  const ok=checks.every(x=>x.ok);window.ADERENCIA_RC50_HEALTH={ok,checks,cacheStats:window.ADERENCIA_RUNTIME_CACHE?.stats||null,ocr:window.ADERENCIA_OCR_LAZY||null,checkedAt:new Date().toISOString()};
- if(!ok)console.warn('RC56 integrity issues',checks.filter(x=>!x.ok));else console.info('RC56 integrity OK');
+ if(!ok)console.warn('RC57 integrity issues',checks.filter(x=>!x.ok));else console.info('RC57 integrity OK');
  return window.ADERENCIA_RC50_HEALTH;
 }
 const schedule=()=>setTimeout(run,1200);
