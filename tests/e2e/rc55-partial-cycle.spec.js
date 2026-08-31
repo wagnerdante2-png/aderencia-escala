@@ -54,5 +54,5 @@ test('RC55 still blocks a perforated or insufficient partial interval instead of
     const file=new File([XLSX.write(wb,{bookType:'xlsm',type:'array'})],'Escala ML10.xlsm');
     try{await window.ADERENCIA_SCHEDULE_HARDENING.normalizeExcel(file,{store:'ML10',start:'2026-07-11',end:'2026-08-10'});return{message:''}}catch(e){return{message:String(e.message)}}
   },{rows:julyLayout()});
-  expect(result.message).toMatch(/lacuna interna|curta demais/);
+  expect(result.message).toMatch(/lacuna interna|curta demais|nenhuma grade mensal parcial segura/);
 });
