@@ -1,0 +1,127 @@
+name: Build Executable RC54
+
+on:
+  push:
+    branches:
+      - build-exe-rc54-20260831
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-executable:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout exact repository state
+        uses: actions/checkout@v4
+
+      - name: Prepare embedded application package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path runtime | Out-Null
+          Copy-Item -Path index.html -Destination runtime
+          Copy-Item -Path *.js -Destination runtime
+          Copy-Item -Path *.css -Destination runtime
+          if (Test-Path LEIA-ME_LOCAL.txt) { Copy-Item LEIA-ME_LOCAL.txt runtime }
+          if (Test-Path README.md) { Copy-Item README.md runtime }
+          Compress-Archive -Path runtime\* -DestinationPath app.zip -Force
+
+      - name: Generate standalone Windows launcher source
+        shell: pwsh
+        run: |
+          @'
+          using System;
+          using System.Diagnostics;
+          using System.IO;
+          using System.IO.Compression;
+          using System.Reflection;
+          using System.Windows.Forms;
+
+          internal static class Program
+          {
+              private const string VersionName = "RC54";
+              private const string CommitSha = "15b1158d735b44f80ac85209be942556d6eca20e";
+
+              [STAThread]
+              private static void Main()
+              {
+                  try
+                  {
+                      string baseDir = Path.Combine(
+                          Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                          "AderenciaEscala",
+                          VersionName + "-" + CommitSha.Substring(0, 8));
+                      Directory.CreateDirectory(baseDir);
+
+                      Assembly asm = Assembly.GetExecutingAssembly();
+                      using (Stream resource = asm.GetManifestResourceStream("AderenciaEscala.AppZip"))
+                      {
+                          if (resource == null)
+                              throw new InvalidOperationException("Pacote interno da aplicação não encontrado.");
+
+                          using (ZipArchive zip = new ZipArchive(resource, ZipArchiveMode.Read))
+                          {
+                              foreach (ZipArchiveEntry entry in zip.Entries)
+                              {
+                                  string destination = Path.GetFullPath(Path.Combine(baseDir, entry.FullName));
+                                  string safeRoot = Path.GetFullPath(baseDir + Path.DirectorySeparatorChar);
+                                  if (!destination.StartsWith(safeRoot, StringComparison.OrdinalIgnoreCase))
+                                      throw new InvalidOperationException("Entrada inválida no pacote interno.");
+
+                                  if (string.IsNullOrEmpty(entry.Name))
+                                  {
+                                      Directory.CreateDirectory(destination);
+                                      continue;
+                                  }
+
+                                  string parent = Path.GetDirectoryName(destination);
+                                  if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
+                                  using (Stream input = entry.Open())
+                                  using (FileStream output = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None))
+                                      input.CopyTo(output);
+                              }
+                          }
+                      }
+
+                      string indexPath = Path.Combine(baseDir, "index.html");
+                      if (!File.Exists(indexPath))
+                          throw new FileNotFoundException("index.html não encontrado após a extração.", indexPath);
+
+                      Process.Start(new ProcessStartInfo(indexPath) { UseShellExecute = true });
+                  }
+                  catch (Exception ex)
+                  {
+                      MessageBox.Show(
+                          "Não foi possível iniciar Aderência de Escala.\n\n" + ex.Message,
+                          "Aderência de Escala " + VersionName,
+                          MessageBoxButtons.OK,
+                          MessageBoxIcon.Error);
+                      Environment.ExitCode = 1;
+                  }
+              }
+          }
+          '@ | Set-Content -Path launcher.cs -Encoding UTF8
+
+      - name: Compile native Windows executable wrapper
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          if (-not (Test-Path $csc)) { throw "Compilador C# do Windows não encontrado: $csc" }
+          & $csc /nologo /target:winexe /optimize+ /out:dist\Aderencia_Escala_RC54.exe /resource:app.zip,AderenciaEscala.AppZip /reference:System.IO.Compression.dll /reference:System.IO.Compression.FileSystem.dll /reference:System.Windows.Forms.dll launcher.cs
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao compilar o executável (csc exit $LASTEXITCODE)." }
+          Get-FileHash dist\Aderencia_Escala_RC54.exe -Algorithm SHA256 | Format-List | Out-File dist\SHA256.txt -Encoding ascii
+          "Repository: wagnerdante2-png/aderencia-escala" | Out-File dist\BUILD_INFO.txt -Encoding utf8
+          "Branch source: main" | Out-File dist\BUILD_INFO.txt -Encoding utf8 -Append
+          "Commit: 15b1158d735b44f80ac85209be942556d6eca20e" | Out-File dist\BUILD_INFO.txt -Encoding utf8 -Append
+          "Version: RC54" | Out-File dist\BUILD_INFO.txt -Encoding utf8 -Append
+          "Built: $([DateTime]::UtcNow.ToString('u')) UTC" | Out-File dist\BUILD_INFO.txt -Encoding utf8 -Append
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aderencia_Escala_RC54_Windows
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
