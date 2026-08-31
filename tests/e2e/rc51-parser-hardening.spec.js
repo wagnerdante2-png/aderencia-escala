@@ -71,14 +71,16 @@ test('RC56 ML11 monthly PDF uses calendar month instead of day-number remapping'
   expect(result.dates).not.toContain('2026-06-11');
 });
 
-test('RC51 hardening module and RC56 PDF parser are active at startup', async ({ page }) => {
+test('RC51 hardening module and RC57 PDF parser are active at startup', async ({ page }) => {
   const state = await page.evaluate(() => ({
     hardening: window.ADERENCIA_SCHEDULE_HARDENING?.version,
     parser: window.ADERENCIA_PDF_PARSER_VERSION,
-    modules: window.ADERENCIA_ACTIVE_MODULES || []
+    modules: window.ADERENCIA_ACTIVE_MODULES || [],
+    alias: window.ADERENCIA_PDF_CALENDAR_RC56 === window.ADERENCIA_PDF_CALENDAR_RC57
   }));
   expect(state.hardening).toMatch(/^RC51(?:\.|$)/);
-  expect(state.parser).toBe('RC56');
+  expect(state.parser).toBe('RC57');
   expect(state.modules).toContain('schedule-hardening-rc51.js');
-  expect(state.modules).toContain('pdf-schedule-parser-rc56.js');
+  expect(state.modules).toContain('pdf-schedule-parser-rc57.js');
+  expect(state.alias).toBeTruthy();
 });
