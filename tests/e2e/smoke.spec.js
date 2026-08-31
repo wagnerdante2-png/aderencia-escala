@@ -26,7 +26,7 @@ test('startup has no uncaught errors and RC50 integrity is green', async ({ page
   console.log('RC50_RUNTIME_DIAG', JSON.stringify({runtimeFlag:health.runtimeFlag,runtime:!!health.runtime,pdfFlag:health.pdfFlag,pdf:health.pdf||null}));
   console.log('RC50_FAILED_CHECKS', JSON.stringify(health.failed));
   expect(errors, 'Uncaught browser errors').toEqual([]);
-  expect(health.version).toBe('v1.0 RC53');
+  expect(health.version).toBe('v1.0 RC55');
   expect(health.core?.ok).toBeTruthy();
   expect(health.final?.ok, JSON.stringify(health.failed)).toBeTruthy();
   expect(health.pdf).toMatchObject({ active:true, isEvalSupported:false, enableScripting:false });
