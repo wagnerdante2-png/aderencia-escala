@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 async function openApp(page){
   await page.goto('/index.html');
-  await page.waitForFunction(() => !!window.ADERENCIA_SCHEDULE_HARDENING && !!window.XLSX);
+  await page.waitForFunction(() => !!window.ADERENCIA_SCHEDULE_HARDENING && !!window.ADERENCIA_SCHEDULE_RESILIENCE && !!window.XLSX);
 }
 
 const anchoredStores = ['ML11','ML22','ML25','ML26','ML36','ML41','ML45','ML51','ML52','ML53'];
@@ -48,9 +48,9 @@ test('July gate: structural fallback refuses to run without validated point cont
   expect(message).toContain('contexto validado do espelho indisponível');
 });
 
-test('July gate: fallback rejects a partial 20-day grid for a 31-day competence', async ({ page }) => {
+test('July gate: RC56 preserves a partial 20-day grid proportionally without inventing dates', async ({ page }) => {
   await openApp(page);
-  const message = await page.evaluate(async () => {
+  const result = await page.evaluate(async () => {
     document.getElementById('pointStatus').textContent = 'Reconhecido: 20 funcionário(s) • ML40 • 1681 marcações';
     document.getElementById('metaPeriod').textContent = '11/07/2026 a 10/08/2026';
     const dates = Array.from({length:20},(_,i)=>{
@@ -60,11 +60,18 @@ test('July gate: fallback rejects a partial 20-day grid for a 31-day competence'
     const rows=[['ESCALA OPERACIONAL | LOJA ML40'],['Nome','Cargo',...dates],['ANA TESTE','OPERADOR DE LOJA I',...dates.map(()=> 'T1')],['BIA TESTE','OPERADOR DE LOJA I',...dates.map(()=> 'T1')],['T1 | 08:00 às 17:00']];
     const ws=XLSX.utils.aoa_to_sheet(rows),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Escala Ponto');
     const file=new File([XLSX.write(wb,{bookType:'xlsx',type:'array'})],'ML40.xlsx');
-    try { await window.ADERENCIA_SCHEDULE_HARDENING.normalizeExcel(file,{store:'ML40',start:'2026-07-11',end:'2026-08-10'}); }
-    catch(e){ return String(e.message); }
-    return '';
+    const normalized=await window.ADERENCIA_SCHEDULE_HARDENING.normalizeExcel(file,{store:'ML40',start:'2026-07-11',end:'2026-08-10'});
+    return {name:normalized.name,audit:window.ADERENCIA_SCHEDULE_RESILIENCE.last};
   });
-  expect(message).toMatch(/nenhuma matriz alternativa segura|cobertura de datas insuficiente|cobertura exata da escala insuficiente|cobertura de colaboradores insuficiente|escala reconhecida por nomes.*faltam \d+ dia\(s\).*dias ausentes não são inferidos/i);
+  expect(result.name).toContain('RC56_ML40_');
+  expect(result.audit).toBeTruthy();
+  expect(result.audit.partial).toBeTruthy();
+  expect(result.audit.expectedDays).toBe(31);
+  expect(result.audit.exactDateDays).toBe(20);
+  expect(result.audit.coverage).toBeCloseTo(20/31,5);
+  expect(result.audit.missingDates).toHaveLength(11);
+  expect(result.audit.missingDates[0]).toBe('2026-07-31');
+  expect(result.audit.missingDates.at(-1)).toBe('2026-08-10');
 });
 
 test('July gate: validated 31-day matrix with complete legend normalizes safely', async ({ page }) => {

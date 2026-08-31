@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 async function openApp(page){
   await page.goto('/index.html');
-  await page.waitForFunction(() => !!window.ADERENCIA_SCHEDULE_PARTIAL && !!window.ADERENCIA_SCHEDULE_HARDENING && !!window.XLSX);
+  await page.waitForFunction(() => !!window.ADERENCIA_SCHEDULE_PARTIAL && !!window.ADERENCIA_SCHEDULE_RESILIENCE && !!window.ADERENCIA_SCHEDULE_HARDENING && !!window.ADERENCIA_PDF_CALENDAR_RC56 && !!window.XLSX);
 }
 
 function julyLayout(){
@@ -44,10 +44,10 @@ test('RC55 accepts exact partial intersection 11/07-31/07 for a 11/07-10/08 poin
   expect(result.audit.coverage).toBe(1);
 });
 
-test('RC55 PDF parser applies proportionality instead of blocking 68% calendar overlap', async ({ page }) => {
+test('RC56 PDF parser applies proportionality instead of blocking 68% calendar overlap', async ({ page }) => {
   await openApp(page);
   const result=await page.evaluate(() => {
-    const api=window.ADERENCIA_PDF_CALENDAR_RC54;
+    const api=window.ADERENCIA_PDF_CALENDAR_RC56;
     const pointCycle=Array.from({length:31},(_,i)=>new Date(2026,6,11+i,12));
     const aligned=api.alignRawDays(Array.from({length:31},(_,i)=>i+1),pointCycle,'ESCALA OPERACIONAL | LOJA 12 Julho 2026');
     const policy=api.proportionalPolicy(aligned,pointCycle.length);
@@ -70,7 +70,7 @@ test('RC55 PDF parser applies proportionality instead of blocking 68% calendar o
   expect(result.last).toBe('2026-07-31');
 });
 
-test('RC55 still blocks a perforated or insufficient partial interval instead of inferring dates', async ({ page }) => {
+test('RC56 recovers a perforated partial interval without inventing missing dates', async ({ page }) => {
   await openApp(page);
   const result=await page.evaluate(async ({rows})=>{
     document.getElementById('pointStatus').textContent='Reconhecido: 21 funcionário(s) • ML10 • 1514 marcações';
@@ -78,7 +78,16 @@ test('RC55 still blocks a perforated or insufficient partial interval instead of
     rows[6].splice(14,1); rows[7].splice(14,1); for(let r=8;r<rows.length;r++)rows[r].splice(14,1);
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Escala Mensal');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['T1 | 07:00 às 16:00']]),'Configuração');
     const file=new File([XLSX.write(wb,{bookType:'xlsm',type:'array'})],'Escala ML10.xlsm');
-    try{await window.ADERENCIA_SCHEDULE_HARDENING.normalizeExcel(file,{store:'ML10',start:'2026-07-11',end:'2026-08-10'});return{message:''}}catch(e){return{message:String(e.message)}}
+    const normalized=await window.ADERENCIA_SCHEDULE_HARDENING.normalizeExcel(file,{store:'ML10',start:'2026-07-11',end:'2026-08-10'});
+    return {name:normalized.name,audit:window.ADERENCIA_SCHEDULE_RESILIENCE.last};
   },{rows:julyLayout()});
-  expect(result.message).toMatch(/lacuna interna|curta demais|nenhuma grade mensal parcial segura/);
+  expect(result.name).toContain('RC56_ML10_');
+  expect(result.audit).toBeTruthy();
+  expect(result.audit.partial).toBeTruthy();
+  expect(result.audit.expectedDays).toBe(31);
+  expect(result.audit.exactDateDays).toBe(20);
+  expect(result.audit.coverage).toBeCloseTo(20/31,5);
+  expect(result.audit.missingDates).toHaveLength(11);
+  expect(result.audit.missingDates).toContain('2026-07-11');
+  expect(result.audit.missingDates).toContain('2026-08-10');
 });

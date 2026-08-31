@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/index.html');
-  await page.waitForFunction(() => window.ADERENCIA_SCHEDULE_HARDENING && window.XLSX);
+  await page.waitForFunction(() => window.ADERENCIA_SCHEDULE_HARDENING && window.ADERENCIA_PDF_CALENDAR_RC56 && window.XLSX);
 });
 
 test('RC51 point context reuses already validated store and competence', async ({ page }) => {
@@ -57,9 +57,9 @@ test('RC51 normalizer prefers validated point store over stale workbook template
   expect(result.legend).toContain('08:00');
 });
 
-test('RC54 ML11 monthly PDF uses calendar month instead of day-number remapping', async ({ page }) => {
+test('RC56 ML11 monthly PDF uses calendar month instead of day-number remapping', async ({ page }) => {
   const result = await page.evaluate(() => {
-    const api=window.ADERENCIA_PDF_CALENDAR_RC54;
+    const api=window.ADERENCIA_PDF_CALENDAR_RC56;
     const dates=Array.from({length:30},(_,i)=>new Date(2026,5,11+i,12));
     const aligned=api.alignRawDays(Array.from({length:31},(_,i)=>i+1),dates,'ESCALA OPERACIONAL | LOJA 11 Julho 2026');
     return {coverage:aligned.coverage,dates:aligned.pairs.map(p=>p.date.toISOString().slice(0,10)),calendar:aligned.calendar};
@@ -71,13 +71,14 @@ test('RC54 ML11 monthly PDF uses calendar month instead of day-number remapping'
   expect(result.dates).not.toContain('2026-06-11');
 });
 
-test('RC51 hardening module and RC54 PDF parser are active at startup', async ({ page }) => {
+test('RC51 hardening module and RC56 PDF parser are active at startup', async ({ page }) => {
   const state = await page.evaluate(() => ({
     hardening: window.ADERENCIA_SCHEDULE_HARDENING?.version,
     parser: window.ADERENCIA_PDF_PARSER_VERSION,
     modules: window.ADERENCIA_ACTIVE_MODULES || []
   }));
   expect(state.hardening).toMatch(/^RC51(?:\.|$)/);
-  expect(state.parser).toBe('RC54');
+  expect(state.parser).toBe('RC56');
   expect(state.modules).toContain('schedule-hardening-rc51.js');
+  expect(state.modules).toContain('pdf-schedule-parser-rc56.js');
 });
