@@ -1,16 +1,25 @@
-ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC40
+ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC58
 
-1. Extraia a pasta do pacote.
-2. Abra index.html com duplo clique, preferencialmente no Microsoft Edge ou Google Chrome atualizado.
-3. Na primeira utilização, clique em "Criar base" e salve o arquivo aderencia-dados.json, de preferência dentro da própria pasta da aplicação.
-4. Em outro computador, use "Vincular base" e selecione o mesmo aderencia-dados.json para recuperar histórico, divergências, configurações e cadastro de lojas/regionais.
-5. Selecione o PDF do espelho de ponto.
-6. Selecione a escala, preferencialmente em XLSX/XLSM/XLS. PDF de escala é aceito como contingência e passa por validações adicionais.
-7. Clique em Calcular aderência.
-8. Antes de confiar em uma leitura incomum, use "Diagnóstico da leitura" para conferir a matriz Funcionário × Data × Código interpretada pela engine.
-9. Salve o resultado no histórico quando estiver validado.
+1. Para uso operacional no Windows, prefira o artefato Aderencia_Escala_RC58_Portable_Windows gerado pelo GitHub Actions.
+2. Extraia TODO o ZIP para uma pasta normal do Windows antes de abrir qualquer arquivo.
+3. Abra index.html com duplo clique, preferencialmente no Microsoft Edge ou Google Chrome atualizado.
+4. Na primeira utilização, clique em "Criar base" e salve o arquivo aderencia-dados.json, de preferência dentro da própria pasta da aplicação.
+5. Em outro computador, use "Vincular base" e selecione o mesmo aderencia-dados.json para recuperar histórico, divergências, configurações e cadastro de lojas/regionais.
+6. Selecione o PDF do espelho de ponto.
+7. Selecione a escala, preferencialmente em XLSX/XLSM/XLS. PDF de escala é aceito como contingência e passa por validações adicionais.
+8. Clique em Calcular aderência.
+9. Antes de confiar em uma leitura incomum, use "Diagnóstico da leitura" para conferir a matriz Funcionário × Data × Código interpretada pela engine.
+10. Salve o resultado no histórico quando estiver validado.
 
-COMPETÊNCIA: o mês pertence ao início do período integral do espelho. Exemplo: 11/06 a 10/07 = Junho; 11/07 a 10/08 = Julho. Se a escala cobrir apenas parte do ciclo, o cálculo usa proporcionalmente os dias de interseção disponíveis.
+VERSÃO E MOTOR
+- Runtime atual: v1.0 RC58.
+- Recuperação estrutural ativa: RC58-R3.
+- Parser PDF principal: RC58.
+- Conciliação estrutural principal: RC58.1.
+- O módulo de recuperação R2 permanece no repositório apenas como histórico técnico e NÃO integra a lista ativa.
+
+COMPETÊNCIA
+O mês pertence ao início do período integral do espelho. Exemplo: 11/06 a 10/07 = Junho; 11/07 a 10/08 = Julho. Se a escala cobrir apenas parte do ciclo, o cálculo usa proporcionalmente os dias de interseção disponíveis.
 
 O seletor Mês/Ano do painel superior é a competência global. Ao alterá-lo, Histórico, Monitoramento, Divergências, Evolução, Semestral pelo ano e exportações relacionadas acompanham a mesma referência temporal.
 
@@ -22,6 +31,12 @@ O menu Lojas permite cadastrar novas unidades e atribuir uma regional sem altera
 
 O menu Administrador permite habilitar ou ocultar o botão "Limpar histórico". Não há senha. Quando o histórico é apagado, as divergências relacionadas também são zeradas e a base portátil vinculada recebe a alteração.
 
-Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
+PACOTE PORTÁTIL RC58
+O artefato Portable gerado pelo workflow inclui localmente os arquivos JavaScript usados no startup para PDF.js, SheetJS/XLSX e jsPDF, além do carregador do Tesseract.js. Assim, a abertura normal do pacote portátil não depende das CDNs dessas bibliotecas. O OCR é um recurso explícito sob demanda e pode exigir recursos adicionais do Tesseract (worker/core/dados de idioma) quando for efetivamente acionado; portanto, não trate OCR totalmente offline como requisito certificado desta versão.
 
-IMPORTANTE: PDF.js, SheetJS, jsPDF e Tesseract.js são carregados pela internet quando a página abre. Os arquivos analisados permanecem no navegador e não são enviados para um servidor por esta aplicação.
+Se você abrir diretamente o código-fonte do repositório em vez do artefato Portable, o index.html de desenvolvimento referencia bibliotecas por CDN e requer conexão para carregá-las.
+
+Não é necessário Git, Python, PowerShell, Codespaces ou servidor local para usar o artefato Portable extraído.
+
+INTEGRIDADE
+O pacote Portable contém MANIFEST_SHA256.txt e o ZIP é acompanhado por um arquivo .sha256.txt. O workflow verifica arquivos essenciais, módulos ativos, referências locais e bloqueia executáveis/scripts de instalação antes de publicar o artefato.

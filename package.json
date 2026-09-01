@@ -1,7 +1,7 @@
 {
   "name": "aderencia-escala-e2e",
   "private": true,
-  "version": "1.0.0-rc50",
+  "version": "1.0.0-rc58",
   "scripts": {
     "serve": "python3 -m http.server 4173",
     "test:e2e": "playwright test",
