@@ -3,47 +3,35 @@ name: RC50 End-to-End
 on:
   workflow_dispatch:
   push:
-    branches:
-      - fix-partial-cycle-rc55-20260831
-
-permissions:
-  contents: read
+    paths:
+      - "*.js"
+      - "*.html"
+      - "*.css"
+      - "package.json"
+      - "package-lock.json"
+      - "tests/e2e/**"
+      - "tests/fixtures/**"
+      - ".github/workflows/e2e-rc50.yml"
 
 jobs:
   e2e:
-    name: Integrity and browser flow
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    env:
+      HOME_URL: http://127.0.0.1:4173/
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
-
-      - name: Install test dependencies
-        run: npm ci
-
-      - name: Report Playwright version
-        run: npx --no-install playwright --version
-
-      - name: Install Chromium
-        run: npx --no-install playwright install chromium
-
-      - name: Validate RC58 integrity-check syntax
+      - run: npm ci
+      - run: npx playwright --version
+      - run: npx playwright install --with-deps chromium
+      - name: Validar sintaxe do health check RC58
         run: node --check rc50-integrity-check.js
-
-      - name: Run npm run test:e2e:chromium
-        run: npm run test:e2e:chromium
-
-      - name: Upload Playwright report
+      - run: npm run test:e2e:chromium
+      - uses: actions/upload-artifact@v6
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: playwright-report-rc50
-          path: playwright-report
-          if-no-files-found: ignore
-          retention-days: 14
+          path: playwright-report/
