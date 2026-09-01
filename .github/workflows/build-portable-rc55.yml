@@ -27,8 +27,8 @@ jobs:
       - name: Confirmar versão
         shell: pwsh
         run: |
-          if (-not (Select-String -Path "index.html" -Pattern "v1.0 RC58" -Quiet)) {
-            throw "index.html não contém v1.0 RC58"
+          if (-not (Select-String -Path "bootstrap.js" -SimpleMatch "window.ADERENCIA_VERSION='v1.0 RC58'" -Quiet)) {
+            throw "bootstrap.js não declara window.ADERENCIA_VERSION='v1.0 RC58'"
           }
 
       - name: Compactar pacote
