@@ -6,7 +6,7 @@ function run(){
  const active=window.ADERENCIA_ACTIVE_MODULES||[];
  add('active-modules',Array.isArray(active)&&active.length>10,`${active.length} módulos`);
  add('no-duplicate-modules',new Set(active).size===active.length);
- const r3Index=active.indexOf('schedule-recovery-r3.js'),r2Index=active.indexOf('schedule-recovery-r2.js'),legacyParserIndex=active.indexOf('pdf-schedule-parser-rc58.js');
+ const r3Index=active.indexOf('schedule-recovery-r3.js'),r2Index=active.indexOf('schedule-recovery-r2.js'),legacyParserIndex=active.indexOf('pdf-schedule-parser-rc58.js'),conflictIndex=active.indexOf('schedule-conflict-guard-rc58.js'),storeIntegrityIndex=active.indexOf('schedule-store-integrity-rc58.js'),preprocessIndex=active.indexOf('schedule-preprocess-rc52.js');
  add('schedule-recovery-r3',window.ADERENCIA_SCHEDULE_RECOVERY_R3?.version==='RC58-R3',window.ADERENCIA_SCHEDULE_RECOVERY_R3?.version||'ausente');
  add('schedule-recovery-r2-retired',r2Index===-1&&!window.ADERENCIA_SCHEDULE_RECOVERY_R2,r2Index===-1?'inativo':'ativo');
  add('schedule-recovery-order',r3Index>=0&&legacyParserIndex>r3Index,`R3=${r3Index}; parser=${legacyParserIndex}`);
@@ -31,6 +31,8 @@ function run(){
  add('schedule-reconciliation',/^RC57(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_RECONCILIATION?.version||''),window.ADERENCIA_SCHEDULE_RECONCILIATION?.version||'ausente');
  add('schedule-reconciliation-rc58',/^RC58(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_RECONCILIATION_RC58?.version||''),window.ADERENCIA_SCHEDULE_RECONCILIATION_RC58?.version||'ausente');
  add('schedule-conflict-guard',window.ADERENCIA_SCHEDULE_CONFLICT_GUARD?.version==='RC58.1',window.ADERENCIA_SCHEDULE_CONFLICT_GUARD?.version||'ausente');
+ add('schedule-store-integrity',window.ADERENCIA_SCHEDULE_STORE_INTEGRITY?.version==='RC58.1',window.ADERENCIA_SCHEDULE_STORE_INTEGRITY?.version||'ausente');
+ add('schedule-store-integrity-order',conflictIndex>=0&&storeIntegrityIndex>conflictIndex&&preprocessIndex>storeIntegrityIndex,`conflict=${conflictIndex}; store=${storeIntegrityIndex}; preprocess=${preprocessIndex}`);
  add('schedule-preprocess',/^RC52(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_PREPROCESS?.version||''),window.ADERENCIA_SCHEDULE_PREPROCESS?.version||'ausente');
  add('pdf-parser',/^(?:RC28\+RC51|RC54|RC56|RC57|RC58)$/.test(window.ADERENCIA_PDF_PARSER_VERSION||''),window.ADERENCIA_PDF_PARSER_VERSION||'ausente');
  add('pdf-calendar-api',!!window.ADERENCIA_PDF_CALENDAR_RC58);
