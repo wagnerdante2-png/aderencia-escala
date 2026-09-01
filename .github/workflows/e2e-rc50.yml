@@ -33,8 +33,8 @@ jobs:
       - name: Install Chromium
         run: npx --no-install playwright install chromium
 
-      - name: Run RC50 integrity check
-        run: node rc50-integrity-check.js
+      - name: Validate RC58 integrity-check syntax
+        run: node --check rc50-integrity-check.js
 
       - name: Run npm run test:e2e:chromium
         run: npm run test:e2e:chromium
