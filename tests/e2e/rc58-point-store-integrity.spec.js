@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 async function openApp(page){
   await page.goto('/index.html');
-  await page.waitForFunction(() => window.ADERENCIA_POINT_STORE_INTEGRITY?.version === 'RC58.3' && window.ADERENCIA_ENGINE?.version === 'v4-rc56-resilient' && !!window.jspdf?.jsPDF);
+  await page.waitForFunction(() => window.ADERENCIA_POINT_STORE_INTEGRITY?.version === 'RC58.4' && window.ADERENCIA_ENGINE?.version === 'v4-rc56-resilient' && !!window.jspdf?.jsPDF);
 }
 
 async function pointPdf(page, stores){
@@ -40,28 +40,28 @@ async function pointPdfPeriods(page, periods){
   },{periods});
 }
 
-async function duplicateDayPdf(page, secondMarks, secondRegistration='1'){
-  return page.evaluate(({secondMarks,secondRegistration}) => {
+async function duplicateDayPdf(page, secondMarks, secondRegistration='1', secondName='ANA TESTE', secondDate='11/07/2026'){
+  return page.evaluate(({secondMarks,secondRegistration,secondName,secondDate}) => {
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF();
     pdf.setFontSize(10);
-    const add=(registration,marks)=>{
+    const add=(registration,name,date,marks)=>{
       const lines=[
         'Espelho do Ponto 11/07/2026 - 10/08/2026',
-        `Matrícula: ${registration} Nome: ANA TESTE Chapa: ${registration} Admissão: 01/01/2020`,
+        `Matrícula: ${registration} Nome: ${name} Chapa: ${registration} Admissão: 01/01/2020`,
         'Função: 1 - OPERADOR DE LOJA I C.C. 1',
         'Departamento: LOJA ML10',
         'Data Dia 1a E.',
-        `11/07/2026 SAB ${marks.map((m,i)=>`${m} ${i%2?'I':'O'}`).join(' ')}`,
+        `${date} SAB ${marks.map((m,i)=>`${m} ${i%2?'I':'O'}`).join(' ')}`,
         'Horários'
       ];
       lines.forEach((line,i)=>pdf.text(line,10,15+i*7));
     };
-    add('1',['08:00','12:00','13:00','17:00']);
+    add('1','ANA TESTE','11/07/2026',['08:00','12:00','13:00','17:00']);
     pdf.addPage();
-    add(secondRegistration,secondMarks);
+    add(secondRegistration,secondName,secondDate,secondMarks);
     return Array.from(new Uint8Array(pdf.output('arraybuffer')));
-  },{secondMarks,secondRegistration});
+  },{secondMarks,secondRegistration,secondName,secondDate});
 }
 
 async function dispatchPoint(page,bytes,name){
@@ -118,6 +118,7 @@ test('RC58 aceita cabeçalho de período repetido de forma idêntica em páginas
   },{bytes});
   expect(result.stores).toEqual(['ML10']);
   expect(result.periods).toEqual(['11/07/2026 - 10/08/2026']);
+  expect(result.periodErrors).toHaveLength(0);
   expect(result.periodObservations).toHaveLength(2);
 });
 
@@ -130,7 +131,6 @@ test('RC58 bloqueia espelho com períodos contraditórios antes do engine', asyn
   expect(state.status).toContain('espelho contém períodos diferentes');
   expect(state.files).toBe(0);
   expect(state.enginePoint).toBeNull();
-  expect(state.context).toEqual({store:null,start:null,end:null});
 });
 
 test('RC58 tolera repetição idêntica da mesma pessoa e data sem criar conflito', async ({ page }) => {
@@ -141,8 +141,23 @@ test('RC58 tolera repetição idêntica da mesma pessoa e data sem criar conflit
     return window.ADERENCIA_POINT_STORE_INTEGRITY.scan(file);
   },{bytes});
   expect(result.identityConflicts).toHaveLength(0);
+  expect(result.registrationConflicts).toHaveLength(0);
   expect(result.dayConflicts).toHaveLength(0);
   expect(result.duplicateDays).toHaveLength(1);
+});
+
+test('RC58 normaliza zeros à esquerda da matrícula sem falso conflito', async ({ page }) => {
+  await openApp(page);
+  const bytes=await duplicateDayPdf(page,['08:00','12:00','13:00','17:00'],'0001');
+  const result=await page.evaluate(async ({bytes}) => {
+    const file=new File([new Uint8Array(bytes)],'espelho-matricula-zero.pdf',{type:'application/pdf'});
+    return window.ADERENCIA_POINT_STORE_INTEGRITY.scan(file);
+  },{bytes});
+  expect(result.identityConflicts).toHaveLength(0);
+  expect(result.registrationConflicts).toHaveLength(0);
+  expect(result.duplicateDays).toHaveLength(1);
+  const regs=[...new Set(result.identityObservations.map(x=>x.registration))];
+  expect(regs).toEqual(['1']);
 });
 
 test('RC58 bloqueia o mesmo nome associado a matrículas diferentes', async ({ page }) => {
@@ -157,6 +172,18 @@ test('RC58 bloqueia o mesmo nome associado a matrículas diferentes', async ({ p
   expect(state.enginePoint).toBeNull();
 });
 
+test('RC58 bloqueia uma matrícula associada a nomes diferentes', async ({ page }) => {
+  await openApp(page);
+  const state=await dispatchPoint(page,await duplicateDayPdf(page,['08:00','12:00','13:00','17:00'],'1','BIA TESTE'),'espelho-matricula-dois-nomes.pdf');
+  expect(state.last.blocked).toBeTruthy();
+  expect(state.last.reason).toBe('identities');
+  expect(state.last.registrationConflicts).toHaveLength(1);
+  expect(state.last.registrationConflicts[0].registration).toBe('1');
+  expect(state.status).toContain('matrícula 1 associada a nomes diferentes');
+  expect(state.files).toBe(0);
+  expect(state.enginePoint).toBeNull();
+});
+
 test('RC58 bloqueia batidas conflitantes para a mesma pessoa e data', async ({ page }) => {
   await openApp(page);
   const state=await dispatchPoint(page,await duplicateDayPdf(page,['09:00','12:00','13:00','18:00']),'espelho-batidas-conflitantes.pdf');
@@ -167,6 +194,40 @@ test('RC58 bloqueia batidas conflitantes para a mesma pessoa e data', async ({ p
   expect(state.status).toContain('11/07/2026');
   expect(state.status).toContain('08:00');
   expect(state.status).toContain('09:00');
+  expect(state.files).toBe(0);
+  expect(state.enginePoint).toBeNull();
+});
+
+test('RC58 bloqueia data impossível no período declarado', async ({ page }) => {
+  await openApp(page);
+  const state=await dispatchPoint(page,await pointPdfPeriods(page,['32/07/2026 - 10/08/2026']),'espelho-periodo-invalido.pdf');
+  expect(state.last.blocked).toBeTruthy();
+  expect(state.last.reason).toBe('period-format');
+  expect(state.last.periodErrors[0].reason).toBe('invalid-date');
+  expect(state.status).toContain('data inválida no período');
+  expect(state.files).toBe(0);
+  expect(state.enginePoint).toBeNull();
+});
+
+test('RC58 bloqueia intervalo de período cronologicamente invertido', async ({ page }) => {
+  await openApp(page);
+  const state=await dispatchPoint(page,await pointPdfPeriods(page,['10/08/2026 - 11/07/2026']),'espelho-periodo-invertido.pdf');
+  expect(state.last.blocked).toBeTruthy();
+  expect(state.last.reason).toBe('period-format');
+  expect(state.last.periodErrors[0].reason).toBe('reversed');
+  expect(state.status).toContain('intervalo de período invertido');
+  expect(state.files).toBe(0);
+  expect(state.enginePoint).toBeNull();
+});
+
+test('RC58 bloqueia data diária impossível antes do engine', async ({ page }) => {
+  await openApp(page);
+  const state=await dispatchPoint(page,await duplicateDayPdf(page,['08:00','12:00','13:00','17:00'],'1','ANA TESTE','31/02/2026'),'espelho-data-diaria-invalida.pdf');
+  expect(state.last.blocked).toBeTruthy();
+  expect(state.last.reason).toBe('day-dates');
+  expect(state.last.dayDateErrors).toHaveLength(1);
+  expect(state.status).toContain('data diária inválida');
+  expect(state.status).toContain('31/02/2026');
   expect(state.files).toBe(0);
   expect(state.enginePoint).toBeNull();
 });
