@@ -34,6 +34,35 @@ async function conflictingFileResult(page, mode='normalize'){
   },{mode});
 }
 
+async function structuralConflict(page, kind){
+  return page.evaluate(async ({kind}) => {
+    const dates=Array.from({length:21},(_,i)=>`${String(11+i).padStart(2,'0')}/07/2026`);
+    const employees=['ANA TESTE','BIA TESTE','CARLA TESTE','DORA TESTE','ELISA TESTE'];
+    const build=(conflict=false)=>[
+      ['Empregado','Cargo',...dates],
+      ...employees.map((name,i)=>[name,'OPERADOR',...dates.map((_,j)=>conflict&&i===0&&j===0?'F':'T1')]),
+      ['T1 | 08:00 às 17:00']
+    ];
+    const wb=XLSX.utils.book_new();
+    if(kind==='cross-sheet'){
+      XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(build(false)),'Layout Especial A');
+      XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(build(true)),'Layout Especial B');
+    }else{
+      const rows=build(false),dupIndex=2;
+      rows[0].splice(dupIndex+1,0,rows[0][dupIndex]);
+      for(let r=1;r<=employees.length;r++)rows[r].splice(dupIndex+1,0,r===1?'F':rows[r][dupIndex]);
+      XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Layout Especial');
+    }
+    const file=new File([XLSX.write(wb,{bookType:'xlsx',type:'array'})],`Escala ML10 ${kind}.xlsx`);
+    try{
+      await window.ADERENCIA_SCHEDULE_HARDENING.normalizeExcel(file,{store:'ML10',start:'2026-07-11',end:'2026-08-10'});
+      return {accepted:true,message:'',code:null,fatal:false,scan:window.ADERENCIA_SCHEDULE_CONFLICT_GUARD.lastScan};
+    }catch(e){
+      return {accepted:false,message:String(e.message),code:e.code||null,fatal:e.aderenciaFatal===true,scan:window.ADERENCIA_SCHEDULE_CONFLICT_GUARD.lastScan};
+    }
+  },{kind});
+}
+
 test('RC58 public normalization makes contradictory RC55 grids fatal across all fallbacks', async ({ page }) => {
   await openApp(page);
   const result=await conflictingFileResult(page,'normalize');
@@ -46,6 +75,31 @@ test('RC58 public normalization makes contradictory RC55 grids fatal across all 
   expect(result.message).toContain('11/07/2026');
   expect(result.message).toContain('Grade A');
   expect(result.message).toContain('Grade B');
+});
+
+test('RC58 structural guard catches cross-sheet conflict outside the RC55 header vocabulary', async ({ page }) => {
+  await openApp(page);
+  const result=await structuralConflict(page,'cross-sheet');
+  expect(result.accepted).toBeFalsy();
+  expect(result.code).toBe('ADERENCIA_CONFLICTING_SCHEDULE_GRIDS');
+  expect(result.fatal).toBeTruthy();
+  expect(result.message).toContain('ANA TESTE');
+  expect(result.message).toContain('11/07/2026');
+  expect(result.message).toContain('Layout Especial A');
+  expect(result.message).toContain('Layout Especial B');
+  expect(result.scan?.conflict).toBeTruthy();
+});
+
+test('RC58 structural guard catches contradictory duplicate date columns inside one grid', async ({ page }) => {
+  await openApp(page);
+  const result=await structuralConflict(page,'duplicate-date');
+  expect(result.accepted).toBeFalsy();
+  expect(result.code).toBe('ADERENCIA_CONFLICTING_SCHEDULE_GRIDS');
+  expect(result.fatal).toBeTruthy();
+  expect(result.message).toContain('ANA TESTE');
+  expect(result.message).toContain('11/07/2026');
+  expect(result.message).toContain('Layout Especial');
+  expect(result.scan?.conflict).toBeTruthy();
 });
 
 test('RC58 preprocess does not pass a fatally conflicting workbook to the main parser', async ({ page }) => {
