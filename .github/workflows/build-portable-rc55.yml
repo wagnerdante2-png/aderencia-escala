@@ -18,7 +18,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "AderenciaEscala-RC58" | Out-Null
-          Copy-Item "index.html","style.css","app.js","bootstrap.js","favicon.svg","app-icon.svg" "AderenciaEscala-RC58/"
+          Copy-Item "index.html","styles.css","dashboard.css" "AderenciaEscala-RC58/"
           Copy-Item "*.js" "AderenciaEscala-RC58/" -Force
 
       - name: Validar sintaxe JavaScript
