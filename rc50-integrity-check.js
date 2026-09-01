@@ -17,7 +17,7 @@ function run(){
  add('pdf-security',window.ADERENCIA_PDF_SECURITY?.active===true,window.ADERENCIA_PDF_SECURITY?.version||'ausente');
  add('pdf-no-eval',window.ADERENCIA_PDF_SECURITY?.isEvalSupported===false);
  add('pdf-no-scripting',window.ADERENCIA_PDF_SECURITY?.enableScripting===false);
- add('point-store-integrity',window.ADERENCIA_POINT_STORE_INTEGRITY?.version==='RC58.2',window.ADERENCIA_POINT_STORE_INTEGRITY?.version||'ausente');
+ add('point-store-integrity',window.ADERENCIA_POINT_STORE_INTEGRITY?.version==='RC58.3',window.ADERENCIA_POINT_STORE_INTEGRITY?.version||'ausente');
  add('point-store-integrity-order',pointSemanticsIndex>=0&&pointStoreIndex>pointSemanticsIndex,`semantics=${pointSemanticsIndex}; store=${pointStoreIndex}`);
  add('history',!!window.ADERENCIA_HISTORY);
  add('period-api',!!window.ADERENCIA_PERIOD);
