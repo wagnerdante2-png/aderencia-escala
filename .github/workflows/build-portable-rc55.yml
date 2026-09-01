@@ -14,12 +14,79 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
+
       - name: Preparar pasta portátil
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "AderenciaEscala-RC58" | Out-Null
           Copy-Item "index.html","styles.css","dashboard.css" "AderenciaEscala-RC58/"
           Copy-Item "*.js" "AderenciaEscala-RC58/" -Force
+
+      - name: Criar lançador executável Windows
+        shell: pwsh
+        run: |
+          $source = @'
+          using System;
+          using System.Diagnostics;
+          using System.IO;
+          using System.Windows.Forms;
+
+          internal static class Program
+          {
+              [STAThread]
+              private static void Main()
+              {
+                  try
+                  {
+                      string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                      string indexPath = Path.Combine(baseDir, "index.html");
+                      if (!File.Exists(indexPath))
+                      {
+                          MessageBox.Show(
+                              "O arquivo index.html não foi encontrado ao lado do executável. Extraia o pacote completo antes de iniciar.",
+                              "Aderência de Escala RC58",
+                              MessageBoxButtons.OK,
+                              MessageBoxIcon.Error);
+                          return;
+                      }
+
+                      var startInfo = new ProcessStartInfo
+                      {
+                          FileName = indexPath,
+                          WorkingDirectory = baseDir,
+                          UseShellExecute = true
+                      };
+                      Process.Start(startInfo);
+                  }
+                  catch (Exception ex)
+                  {
+                      MessageBox.Show(
+                          "Não foi possível iniciar a aplicação.\r\n\r\n" + ex.Message,
+                          "Aderência de Escala RC58",
+                          MessageBoxButtons.OK,
+                          MessageBoxIcon.Error);
+                  }
+              }
+          }
+          '@
+          Set-Content -Path "AderenciaEscalaLauncher.cs" -Value $source -Encoding UTF8
+
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          if (-not (Test-Path $csc)) {
+            $csc = "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
+          }
+          if (-not (Test-Path $csc)) {
+            throw "Compilador C# do .NET Framework não encontrado no runner Windows."
+          }
+
+          & $csc /nologo /target:winexe /optimize+ /reference:System.dll /reference:System.Windows.Forms.dll /out:"AderenciaEscala-RC58\AderenciaEscala.exe" "AderenciaEscalaLauncher.cs"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Falha ao compilar AderenciaEscala.exe"
+          }
+          if (-not (Test-Path "AderenciaEscala-RC58\AderenciaEscala.exe")) {
+            throw "AderenciaEscala.exe não foi gerado."
+          }
+          Get-FileHash "AderenciaEscala-RC58\AderenciaEscala.exe" -Algorithm SHA256 | Format-List
 
       - name: Validar sintaxe de todos os JavaScripts
         shell: pwsh
@@ -45,9 +112,9 @@ jobs:
 
       - name: Compactar pacote
         shell: pwsh
-        run: Compress-Archive -Path "AderenciaEscala-RC58/*" -DestinationPath "AderenciaEscala-RC58.zip" -Force
+        run: Compress-Archive -Path "AderenciaEscala-RC58/*" -DestinationPath "AderenciaEscala-RC58-Executavel-Windows.zip" -Force
 
       - uses: actions/upload-artifact@v6
         with:
-          name: AderenciaEscala-RC58-Windows
-          path: AderenciaEscala-RC58.zip
+          name: AderenciaEscala-RC58-Windows-Executavel
+          path: AderenciaEscala-RC58-Executavel-Windows.zip
