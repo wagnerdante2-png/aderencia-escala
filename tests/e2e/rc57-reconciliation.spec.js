@@ -101,6 +101,28 @@ test('RC57 multipage merge remains available as a compatibility alias under the 
   expect(result.parser).toBe('RC58');
 });
 
+test('RC58 multipage merge rejects contradictory codes for the same employee and date', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const merge = window.ADERENCIA_PDF_CALENDAR_RC57.mergeEmployeeSlices;
+    try {
+      merge([
+        { key:'ANA SILVA', name:'ANA SILVA', cargo:'OPERADOR', pointMatched:true, days:new Map([['2026-07-11','T1'],['2026-07-12','F']]) },
+        { key:'ANA SILVA', name:'ANA SILVA', cargo:'OPERADOR', pointMatched:true, days:new Map([['2026-07-11','F'],['2026-07-13','T1']]) }
+      ]);
+      return { accepted:true, message:'', code:null, fatal:false };
+    } catch (e) {
+      return { accepted:false, message:String(e.message), code:e.code||null, fatal:e.aderenciaFatal===true };
+    }
+  });
+  expect(result.accepted).toBeFalsy();
+  expect(result.code).toBe('ADERENCIA_CONFLICTING_PDF_SLICES');
+  expect(result.fatal).toBeTruthy();
+  expect(result.message).toContain('ANA SILVA');
+  expect(result.message).toContain('11/07/2026');
+  expect(result.message).toContain('T1');
+  expect(result.message).toContain('F');
+});
+
 test('RC57 accepts embedded shift text without inventing missing times', async ({ page }) => {
   const data = await page.evaluate(() => ({
     t1: window.ADERENCIA_SCHEDULE_RECONCILIATION.extractCode('T1 08:00 - 17:00'),

@@ -16,12 +16,18 @@ test('motor trata cobertura e confiança como diagnóstico, não como bloqueio',
   expect(code).not.toContain('alert(err.message)');
 });
 
-test('parser PDF ancora loja no espelho e tolera turno sem legenda sem inventar horário', async ({ page }) => {
-  const code = await page.evaluate(() => fetch('/pdf-schedule-parser-rc56.js').then(r => r.text()));
-  expect(code).toContain('store=expectedStore');
-  expect(code).toContain('missingTurns');
-  expect(code).toContain('registros afetados serão excluídos do cálculo');
-  expect(code).not.toMatch(/missingTurns[^;]*throw new Error/);
+test('RC58 registra turno sem legenda e motor exclui as marcações afetadas sem inventar horário', async ({ page }) => {
+  const state = await page.evaluate(async () => ({
+    parser: await fetch('/pdf-schedule-parser-rc58.js').then(r => r.text()),
+    engine: await fetch('/engine-v4.js').then(r => r.text()),
+    active: window.ADERENCIA_PDF_PARSER_VERSION
+  }));
+  expect(state.active).toBe('RC58');
+  expect(state.parser).toContain('missingTurns');
+  expect(state.parser).toContain('sem inferir horários');
+  expect(state.engine).toContain('if(!sd.start){unresolvedDays++;unresolvedMarks+=pd.marks.length;continue}');
+  expect(state.engine).toContain('foram excluídas do denominador; nenhum horário foi inventado');
+  expect(state.engine).toContain('turno sem horário conhecido foram excluídos do cálculo; nenhum horário foi inferido');
 });
 
 test('calendário PDF mensal de julho produz interseção proporcional 21 de 31 dias', async ({ page }) => {
