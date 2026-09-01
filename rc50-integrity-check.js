@@ -6,6 +6,10 @@ function run(){
  const active=window.ADERENCIA_ACTIVE_MODULES||[];
  add('active-modules',Array.isArray(active)&&active.length>10,`${active.length} módulos`);
  add('no-duplicate-modules',new Set(active).size===active.length);
+ const r3Index=active.indexOf('schedule-recovery-r3.js'),r2Index=active.indexOf('schedule-recovery-r2.js'),legacyParserIndex=active.indexOf('pdf-schedule-parser-rc58.js');
+ add('schedule-recovery-r3',window.ADERENCIA_SCHEDULE_RECOVERY_R3?.version==='RC58-R3',window.ADERENCIA_SCHEDULE_RECOVERY_R3?.version||'ausente');
+ add('schedule-recovery-r2-retired',r2Index===-1&&!window.ADERENCIA_SCHEDULE_RECOVERY_R2,r2Index===-1?'inativo':'ativo');
+ add('schedule-recovery-order',r3Index>=0&&legacyParserIndex>r3Index,`R3=${r3Index}; parser=${legacyParserIndex}`);
  add('core-health',window.ADERENCIA_HEALTH?.ok===true);
  add('runtime-cache',!!window.ADERENCIA_RUNTIME_CACHE);
  add('ocr-lazy-api',!!window.ADERENCIA_ENSURE_OCR,window.ADERENCIA_OCR_LAZY?.state||'ausente');
@@ -29,6 +33,8 @@ function run(){
  add('schedule-preprocess',/^RC52(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_PREPROCESS?.version||''),window.ADERENCIA_SCHEDULE_PREPROCESS?.version||'ausente');
  add('pdf-parser',/^(?:RC28\+RC51|RC54|RC56|RC57|RC58)$/.test(window.ADERENCIA_PDF_PARSER_VERSION||''),window.ADERENCIA_PDF_PARSER_VERSION||'ausente');
  add('pdf-calendar-api',!!window.ADERENCIA_PDF_CALENDAR_RC58);
+ add('pdf-calendar-legacy-alias',window.ADERENCIA_PDF_CALENDAR_RC57===window.ADERENCIA_PDF_CALENDAR_RC58);
+ add('pdf-calendar-proportional-policy',typeof window.ADERENCIA_PDF_CALENDAR_RC58?.proportionalPolicy==='function');
  add('result-sanity',/^RC58(?:\.|$)/.test(window.ADERENCIA_RESULT_SANITY_RC58?.version||''),window.ADERENCIA_RESULT_SANITY_RC58?.version||'ausente');
  add('pdf-xlsx-compat',window.ADERENCIA_PDF_XLSX_COMPAT_VERSION==='RC21',window.ADERENCIA_PDF_XLSX_COMPAT_VERSION||'ausente');
  add('recurrence',!!window.ADERENCIA_RECURRENCE);
