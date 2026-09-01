@@ -1,157 +1,170 @@
-# Especificação do parser de escalas PDF - RC13
+# Especificação do parser de escalas PDF — RC58
 
 ## Objetivo
 
-Transformar uma escala PDF em uma matriz determinística `Loja × Colaborador × Cargo × Data × Código`, com a mesma estrutura lógica usada pelo parser Excel. O PDF nunca deve gerar um percentual de aderência se a matriz não puder ser reconstruída com evidências suficientes.
+Transformar uma escala PDF em uma matriz determinística `Loja × Colaborador × Cargo × Data × Código`, compatível com a estrutura lógica usada pelo fluxo Excel. O PDF não deve produzir percentual de aderência quando a matriz não puder ser reconstruída com evidências estruturais suficientes.
 
-## Mapeamento do PDF de referência
+Esta especificação descreve o contrato operacional da RC58. Referências geométricas usadas em estudos e RCs anteriores permanecem úteis como material histórico, mas não são parâmetros fixos do parser atual.
 
-Arquivo analisado: `Escala de Folgas - 33 - 06-07-2026(2).pdf`.
+## Ordem de recuperação
 
-Características observadas na página:
+A recuperação estrutural `schedule-recovery-r3.js` é carregada antes dos parsers PDF legados. O módulo R2 permanece aposentado do runtime ativo.
 
-- Página única em aproximadamente 841,68 × 595,20 pontos.
-- Cabeçalho operacional identifica `LOJA 33`, `Julho`, `2026` e `ML33 - CAMPINAS AMOREIRAS`.
-- A linha de datas possui 31 colunas: `11, 12, ... 31, 1, 2, ... 10`.
-- A linha imediatamente associada contém os dias da semana: `sáb, dom, seg, ...`.
-- No arquivo de referência, os centros das 31 colunas são aproximadamente 258,9 a 730,6 pontos, com passo regular próximo de 15,72 pontos.
-- A coluna Nome ocupa a área à esquerda; Cargo fica entre Nome e a primeira coluna de data.
-- Foram identificadas 39 linhas de colaboradores e todas possuem 31 códigos de escala.
-- A legenda de turnos fica à direita da grade, iniciando aproximadamente após x=754. Isso é crítico: `T1`, `T2`, etc. da legenda podem estar na mesma altura Y das linhas dos colaboradores e jamais podem ser confundidos com células da escala.
+Para PDF, a aplicação prioriza recuperação determinística por camada textual e geometria. O parser principal expõe `ADERENCIA_PDF_PARSER_VERSION === 'RC58'`. O parser RC57 permanece abaixo dele apenas como camada compatível e não deve assumir o evento quando o RC58 já estiver ativo.
 
-## Regra estrutural
+## Contexto obrigatório do espelho
 
-O parser trabalha primeiro por geometria da página e somente depois por texto corrido.
+Antes de transformar uma escala PDF, o parser precisa conhecer a competência do espelho de ponto. A preferência é pelo contexto já validado em `ADERENCIA_POINT_CONTEXT`; como contingência, o período pode ser relido do próprio PDF do espelho.
 
-### 1. Loja
+Quando existe loja validada no espelho, uma identificação explícita divergente no PDF da escala deve bloquear a leitura. O parser não deve escolher silenciosamente outra loja.
 
-Prioridade:
+## Loja
 
-1. cabeçalho `MLxx`;
-2. cabeçalho `LOJA xx`;
-3. nunca usar uma ocorrência de `MLxx` dentro da legenda ou de textos secundários como identificação da loja.
+A identificação considera ocorrências explícitas como `MLxx` e `LOJA xx`, inclusive pistas do nome do arquivo. Quando o espelho já fornece uma loja confiável, ela é a referência para validação cruzada.
 
-### 2. Grade de dias
+## Grade de dias
 
-- Localizar grupos horizontais de números inteiros de 1 a 31.
-- Exigir sequência cronológica coerente, permitindo a virada `31 -> 1`.
-- Medir regularidade do espaçamento entre as colunas.
-- Guardar os centros X das colunas; eles passam a ser a referência geométrica para todas as células.
+O parser agrupa números inteiros de 1 a 31 pela coordenada vertical e procura uma sequência horizontal estruturalmente plausível.
 
-### 3. Datas reais
+A grade candidata é avaliada por:
 
-Nunca assumir que o mês do cabeçalho significa automaticamente mês inicial ou mês de fechamento.
+- quantidade de colunas recuperadas;
+- sequência cronológica, incluindo viradas como `31 → 1`;
+- regularidade do espaçamento horizontal;
+- alinhamento posterior com o período real do espelho.
 
-Para cada PDF são avaliadas três hipóteses:
+Não existe uma coordenada X fixa válida para todas as escalas. Centros de coluna e espaçamento são calculados a partir do próprio PDF.
 
-1. `header-literal`: o primeiro segmento pertence ao mês/ano mostrado no cabeçalho e, após a virada, passa ao mês seguinte;
-2. `header-competencia`: o segmento anterior à virada pertence ao mês anterior e o segmento após a virada pertence ao mês/ano do cabeçalho;
-3. `filename-fallback`: data do nome do arquivo, usada somente como pista auxiliar.
+## Datas reais e competência parcial
 
-As hipóteses são pontuadas por:
+O conjunto temporal permitido vem do período do espelho. A grade do PDF é alinhada contra esse conjunto.
 
-- concordância entre cada data calculada e o dia da semana impresso na escala;
-- sobreposição com o período do espelho de ponto já carregado;
-- data encontrada no nome do arquivo, com peso muito menor.
+Quando o cabeçalho do PDF fornece mês e ano, essa informação é usada para construir as datas candidatas e manter somente aquelas que pertencem à competência esperada. Quando o calendário explícito não é suficiente, o parser procura o grupo mensal do período do espelho que melhor explica os números observados.
 
-A hipótese com maior evidência é usada. Em empate ou baixa concordância, o PDF é bloqueado como ambíguo.
+A análise pode ser proporcional. Exemplo:
 
-### 4. Dias da semana
+- espelho: `11/06/2026 a 10/07/2026`;
+- escala disponível: `01/06/2026 a 30/06/2026`;
+- interseção utilizável: `11/06/2026 a 30/06/2026`.
 
-A linha `seg/ter/qua/qui/sex/sáb/dom` é tratada como checksum temporal. Ela não é decorativa.
+Dias ausentes não entram automaticamente na matriz. Datas não devem ser inventadas para completar o ciclo.
 
-Exemplo: se a coluna 11 é `sáb`, a data inferida para aquela coluna precisa efetivamente cair em sábado. Essa verificação evita deslocar a escala em um mês inteiro e ainda assim produzir um percentual aparentemente válido.
+## Colaborador e cargo
 
-### 5. Nome e Cargo
+A RC58 usa o roster reconhecido no espelho para reforçar a identidade dos colaboradores da escala.
 
-- Localizar os rótulos `Nome` e `Cargo`.
-- Calcular dinamicamente as fronteiras entre as áreas de Nome, Cargo e primeira coluna de data.
-- Para cada linha de códigos, ler Nome e Cargo apenas à esquerda da grade.
-- Dicionário de cargos é usado somente como contingência, não como delimitador principal.
+O fluxo suporta:
 
-### 6. Códigos por célula
+- nome e cargo na mesma linha;
+- nomes fragmentados;
+- aproximação por tokens quando a grafia da escala e do espelho divergem moderadamente;
+- páginas de continuação em que a identidade pode precisar ser carregada pela ordem validada de colaboradores;
+- layouts sem cabeçalho convencional `Nome`, quando a estrutura e o roster oferecem evidência suficiente.
 
-Códigos reconhecidos:
+Quando há roster disponível, linhas que não podem ser conciliadas com evidência mínima não devem ser promovidas como colaboradores válidos apenas para aumentar a cobertura.
 
-- turnos: `T1` a `T30`;
-- folga/ausência: `F`, `FER`, `AF`, `AB`, `AL`, `FF`, `FC`, `NC`, `AE`;
-- flexível: `D`.
+## Códigos por célula
 
-Cada token é associado à coluna cuja coordenada X é a mais próxima. Tokens encontrados fora do limite da grade são descartados. Isso impede que a legenda lateral seja interpretada como escala.
+São reconhecidos turnos `T1` a `T30` e códigos de folga/ausência usados pelo motor, incluindo `F`, `FER`, `AF`, `AB`, `AL`, `FF`, `FC`, `NC`, `AE` e `D`.
 
-### 7. Leitura dupla
+Um mesmo item textual do PDF pode conter vários códigos. A RC58 tokeniza esses itens e distribui representações virtuais ao longo da largura do item antes de associá-los às colunas da grade. Isso evita perder códigos compactados pelo mecanismo de geração do PDF.
 
-Quando há camada de texto:
+Tokens fora da área geométrica da grade não devem ser tratados como células de colaborador, reduzindo o risco de confundir a legenda lateral com a escala.
 
-- matriz espacial por coordenadas;
-- leitura textual da linha;
-- as duas matrizes são cruzadas e usadas para preencher lacunas.
+## Leitura espacial e linear
 
-A geometria tem prioridade para a posição temporal; o texto ajuda em nomes/cargos e células ausentes.
+Para cada página utilizável, a RC58 compara duas estratégias:
 
-### 8. Legenda de turnos
+1. **espacial** — associa tokens às colunas pela proximidade da coordenada X;
+2. **linear** — usa a sequência textual de códigos quando a linha foi extraída de forma mais consistente pelo PDF.js.
 
-A legenda é extraída separadamente por padrões `Txx | HH:MM às HH:MM`.
+A estratégia com maior evidência estrutural para aquela página é escolhida. As páginas são depois consolidadas por identidade do colaborador e data.
 
-Antes de liberar o arquivo:
+## Consolidação entre páginas
 
-- listar todos os `Txx` efetivamente usados na matriz;
-- verificar quantos possuem horário na legenda;
-- bloquear se a cobertura dos turnos ficar abaixo do limite de segurança.
+As fatias reconhecidas são consolidadas em uma matriz única. Para a mesma pessoa/data, o primeiro valor estruturalmente aceito é preservado; páginas posteriores complementam datas ausentes.
 
-### 9. OCR
+A recuperação R3 trata também casos de divisão horizontal de uma grade mensal e pode carregar a identidade do roster para uma página de continuação quando a quantidade e a ordem das linhas são compatíveis.
 
-OCR é contingência, não primeira opção.
+## Legenda de turnos
 
-Fluxo:
+A legenda é extraída por padrões de turno e horário, por exemplo `T1 | 08:00 às 17:00`.
 
-1. tentar camada textual do PDF;
-2. se a matriz tiver baixa confiança, renderizar a página em alta resolução;
-3. OCR com coordenadas das palavras;
-4. executar exatamente o mesmo algoritmo geométrico sobre as coordenadas do OCR;
-5. bloquear se o preenchimento médio das células continuar baixo.
+A RC58 informa os turnos usados na matriz que não possuem horário resolvido. Horários ausentes não são inventados. A existência de turno sem legenda deve permanecer visível no diagnóstico e pode impedir etapas posteriores que dependam do horário previsto.
 
-Assim, PDF textual e PDF-imagem usam o mesmo motor lógico após a etapa de extração.
+## Densidade e sanidade estrutural
 
-## Qualidade da leitura
+A RC58 não considera somente “há algum texto”. Ela mede se a matriz possui densidade suficiente para representar uma escala real.
 
-A confiança do PDF é composta por métricas independentes:
+Depois de consolidar os colaboradores:
 
-- sequência dos dias;
-- regularidade geométrica das colunas;
-- concordância dos dias da semana;
-- preenchimento médio das células;
-- cobertura da legenda de turnos;
-- consistência das linhas de colaboradores.
+- datas com cobertura extremamente baixa são removidas da amostra operacional;
+- se nenhuma data possuir cobertura mínima, a leitura é bloqueada;
+- a densidade global é calculada como células codificadas ÷ (`colaboradores × datas`);
+- amostra PDF com densidade inferior ao limite do parser é rejeitada em vez de gerar percentual silencioso.
 
-Além do percentual resumido, o objeto `window.ADERENCIA_PDF_DEBUG` guarda:
+A camada `result-integrity-rc58.js` acrescenta sanidade ao resultado final. Um zero plausível continua sendo um resultado válido; somente um zero associado a amostra estruturalmente anormal deve ser tratado como suspeito.
 
-- período escolhido;
-- hipóteses de data e suas pontuações;
-- concordância de weekdays;
-- preenchimento das linhas;
-- turnos sem legenda;
-- uso de OCR.
+## Diagnóstico RC58
 
-## Períodos parciais
+O parser publica `window.ADERENCIA_PDF_DEBUG_RC58`.
 
-A regra de cálculo deve operar apenas na interseção entre o período do espelho e o período disponível na escala.
+Em sucesso, o diagnóstico inclui, conforme disponível:
 
-Exemplo:
+- versão;
+- loja;
+- quantidade de colaboradores;
+- quantidade de nomes reconhecidos no espelho;
+- dias calculados e dias esperados;
+- cobertura temporal;
+- densidade de células;
+- datas ausentes;
+- turnos sem horário;
+- auditoria por página e método usado.
 
-- espelho: 11/06 a 10/07;
-- escala: 01/06 a 30/06;
-- análise efetiva: 11/06 a 30/06.
+Em erro, `ADERENCIA_PDF_DEBUG_RC58` registra a versão e a mensagem que bloqueou a leitura.
 
-Dias fora da interseção não entram no denominador e não geram penalização.
+Quando a conversão é aceita, `ADERENCIA_PDF_GRID_INFO` registra metadados resumidos da grade sintética criada para o restante da aplicação.
 
-## Critérios de aceite antes de release
+## Saída sintética
 
-1. PDF de referência deve reconhecer todas as 31 colunas e todas as linhas legíveis.
-2. Dia da semana deve ter concordância temporal >= 95% quando disponível.
-3. Preenchimento médio das células >= 90%; alvo operacional >= 97%.
-4. Nenhum item da legenda lateral pode entrar na matriz de colaborador.
-5. Todos os turnos utilizados precisam ser resolvidos pela legenda, salvo exceção explicitamente diagnosticada.
-6. Excel e PDF que representam a mesma escala devem produzir a mesma matriz ou divergência explicada célula a célula.
-7. Um PDF de imagem deve passar pelo OCR e produzir a mesma estrutura final usada pelo PDF textual.
-8. PDF ambíguo deve ser bloqueado, nunca convertido em um percentual silenciosamente.
+Uma escala PDF aceita é convertida em XLSX sintético com aba `Escala Ponto`. Essa etapa permite reutilizar as camadas de validação e cálculo do fluxo Excel em vez de manter uma segunda fórmula de aderência para PDF.
+
+A saída contém:
+
+- loja;
+- identificação de que a origem foi estruturada pelo parser RC58;
+- quantidade de dias disponíveis e esperados;
+- densidade estrutural;
+- `Nome`, `Cargo` e datas reconhecidas;
+- códigos diários;
+- legenda de turnos extraída.
+
+## OCR
+
+OCR é contingência explícita sob demanda e não faz parte do startup normal. A camada `ocr-lazy-rc48.js` disponibiliza `ADERENCIA_ENSURE_OCR()` para carregamento do Tesseract quando necessário.
+
+A RC58 não deve ser descrita como “OCR integralmente offline” apenas porque o pacote Portable inclui `tesseract.min.js`: worker, core e dados de idioma podem ser necessários quando o OCR for efetivamente acionado.
+
+O caminho homologado deve preferir PDF com camada textual ou Excel/XLSM/XLS sempre que possível. OCR não deve ser usado para mascarar uma estrutura ambígua e produzir um percentual sem evidência suficiente.
+
+## Segurança
+
+As leituras de PDF usam PDF.js com execução dinâmica endurecida. O runtime de segurança mantém `isEvalSupported=false` e `enableScripting=false` no fluxo protegido.
+
+## Critérios de aceite RC58
+
+1. `ADERENCIA_PDF_PARSER_VERSION` deve ser `RC58`.
+2. A recuperação R3 deve estar ativa antes do parser RC58 e o R2 deve permanecer inativo.
+3. Loja explicitamente divergente do espelho deve bloquear a escala.
+4. Datas devem permanecer dentro da competência/interseção validada.
+5. Escala parcial válida deve ser aceita proporcionalmente sem inventar dias ausentes.
+6. Nomes fragmentados devem poder ser conciliados pelo roster do espelho quando houver evidência suficiente.
+7. Página de continuação horizontal deve preservar a identidade dos colaboradores quando a estrutura for compatível.
+8. Itens textuais contendo vários códigos devem preservar todos os códigos reconhecíveis.
+9. Legenda lateral não deve virar célula da grade.
+10. Amostra estruturalmente esparsa deve ser bloqueada ou sinalizada, nunca convertida silenciosamente em resultado confiável.
+11. Zero estruturalmente plausível deve continuar válido; zero falso por amostra anormal deve ser sinalizado.
+12. `ADERENCIA_PDF_DEBUG_RC58` deve explicar a leitura aceita ou a causa do bloqueio.
+13. A saída PDF aceita deve ser convertida em XLSX sintético e passar pelas mesmas camadas canônicas usadas pelo restante da aplicação.
+14. A suíte Playwright RC58 e o build Portable RC58 devem permanecer verdes antes de promoção da branch.

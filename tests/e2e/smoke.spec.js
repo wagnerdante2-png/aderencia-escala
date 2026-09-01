@@ -32,6 +32,16 @@ test('startup has no uncaught errors and RC50 integrity is green', async ({ page
   expect(health.pdf).toMatchObject({ active:true, isEvalSupported:false, enableScripting:false });
 });
 
+test('repository package metadata matches the RC58 runtime', async ({ page }) => {
+  const meta = await page.evaluate(async () => {
+    const response = await fetch('/package.json', { cache:'no-store' });
+    if (!response.ok) throw new Error(`package.json HTTP ${response.status}`);
+    const pkg = await response.json();
+    return { runtime: window.ADERENCIA_VERSION, packageVersion: pkg.version };
+  });
+  expect(meta).toEqual({ runtime:'v1.0 RC58', packageVersion:'1.0.0-rc58' });
+});
+
 test('main navigation renders every operational view', async ({ page }) => {
   await page.getByRole('button', { name: 'Histórico' }).click();
   await expect(page.locator('#historyView')).not.toHaveClass(/hidden/);
