@@ -30,6 +30,7 @@ function run(){
  add('schedule-resilience',/^RC56(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_RESILIENCE?.version||''),window.ADERENCIA_SCHEDULE_RESILIENCE?.version||'ausente');
  add('schedule-reconciliation',/^RC57(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_RECONCILIATION?.version||''),window.ADERENCIA_SCHEDULE_RECONCILIATION?.version||'ausente');
  add('schedule-reconciliation-rc58',/^RC58(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_RECONCILIATION_RC58?.version||''),window.ADERENCIA_SCHEDULE_RECONCILIATION_RC58?.version||'ausente');
+ add('schedule-conflict-guard',window.ADERENCIA_SCHEDULE_CONFLICT_GUARD?.version==='RC58.1',window.ADERENCIA_SCHEDULE_CONFLICT_GUARD?.version||'ausente');
  add('schedule-preprocess',/^RC52(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_PREPROCESS?.version||''),window.ADERENCIA_SCHEDULE_PREPROCESS?.version||'ausente');
  add('pdf-parser',/^(?:RC28\+RC51|RC54|RC56|RC57|RC58)$/.test(window.ADERENCIA_PDF_PARSER_VERSION||''),window.ADERENCIA_PDF_PARSER_VERSION||'ausente');
  add('pdf-calendar-api',!!window.ADERENCIA_PDF_CALENDAR_RC58);

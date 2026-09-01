@@ -24,15 +24,22 @@ window.addEventListener('change',ev=>{
  if(!x){window.ADERENCIA_SCHEDULE_PREPROCESS.last={mode:'bypass',reason:'no-validated-point-context',source:file.name,at:new Date().toISOString()};return}
  ev.preventDefault();ev.stopImmediatePropagation();busy=true;
  const {h,c:ctx}=x;
- if(status){status.textContent='RC57: conciliando escala com colaboradores e dias reconhecidos no espelho...';status.className='status error'}
+ if(status){status.textContent='RC58: conciliando escala com colaboradores e dias reconhecidos no espelho...';status.className='status error'}
  Promise.resolve(h.normalizeExcel(file,ctx)).then(normalized=>{
    window.ADERENCIA_SCHEDULE_PREPROCESS.last={mode:'normalized',source:file.name,target:normalized.name,store:ctx.store,start:ctx.start,end:ctx.end,at:new Date().toISOString()};
    pass(normalized);
  }).catch(error=>{
-   console.warn('RC52/RC57: pré-normalização não aplicada; usando parser principal.',error);
+   if(error?.aderenciaFatal){
+     console.error('RC58: pré-normalização bloqueada por conflito fatal.',error);
+     window.ADERENCIA_SCHEDULE_PREPROCESS.last={mode:'fatal-block',source:file.name,store:ctx.store,start:ctx.start,end:ctx.end,code:error.code||'ADERENCIA_FATAL_SCHEDULE_ERROR',error:String(error?.message||error),at:new Date().toISOString()};
+     if(status){status.textContent=String(error?.message||error);status.className='status error'}
+     try{input.value=''}catch{}
+     return;
+   }
+   console.warn('RC52/RC58: pré-normalização não aplicada; usando parser principal.',error);
    window.ADERENCIA_SCHEDULE_PREPROCESS.last={mode:'core-fallback',source:file.name,store:ctx.store,start:ctx.start,end:ctx.end,error:String(error?.message||error),at:new Date().toISOString()};
    pass(file);
  }).finally(()=>{busy=false});
 },true);
-window.ADERENCIA_SCHEDULE_PREPROCESS={version:'RC52.3',get busy(){return busy},get passing(){return passing},last:null};
+window.ADERENCIA_SCHEDULE_PREPROCESS={version:'RC52.4',get busy(){return busy},get passing(){return passing},last:null};
 })();
