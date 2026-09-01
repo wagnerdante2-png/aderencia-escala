@@ -21,8 +21,20 @@ jobs:
           Copy-Item "index.html","styles.css","dashboard.css" "AderenciaEscala-RC58/"
           Copy-Item "*.js" "AderenciaEscala-RC58/" -Force
 
-      - name: Validar sintaxe JavaScript
-        run: node --check rc50-integrity-check.js
+      - name: Validar sintaxe de todos os JavaScripts
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path . -Filter "*.js" -File
+          if (-not $files) {
+            throw "Nenhum JavaScript encontrado na raiz."
+          }
+          foreach ($file in $files) {
+            Write-Host "Validando $($file.Name)"
+            & node --check $file.FullName
+            if ($LASTEXITCODE -ne 0) {
+              throw "Falha de sintaxe em $($file.Name)"
+            }
+          }
 
       - name: Confirmar versão
         shell: pwsh
