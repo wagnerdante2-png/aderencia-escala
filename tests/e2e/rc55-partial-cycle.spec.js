@@ -79,7 +79,10 @@ test('RC56 recovers a perforated partial interval without inventing missing date
     const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Escala Mensal');XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['T1 | 07:00 às 16:00']]),'Configuração');
     const file=new File([XLSX.write(wb,{bookType:'xlsm',type:'array'})],'Escala ML10.xlsm');
     const normalized=await window.ADERENCIA_SCHEDULE_HARDENING.normalizeExcel(file,{store:'ML10',start:'2026-07-11',end:'2026-08-10'});
-    return {name:normalized.name,audit:window.ADERENCIA_SCHEDULE_RESILIENCE.last};
+    const parsed=XLSX.read(await normalized.arrayBuffer(),{type:'array',cellDates:true});
+    const out=XLSX.utils.sheet_to_json(parsed.Sheets['Escala Ponto'],{header:1,defval:'',raw:false});
+    const employeeRows=out.slice(3).filter(r=>String(r[0]||'').startsWith('FUNCIONARIO TESTE'));
+    return {name:normalized.name,audit:window.ADERENCIA_SCHEDULE_RESILIENCE.last,dates:out[2].slice(2),rowLengths:employeeRows.map(r=>r.length)};
   },{rows:julyLayout()});
   expect(result.name).toContain('RC56_ML10_');
   expect(result.audit).toBeTruthy();
@@ -90,4 +93,43 @@ test('RC56 recovers a perforated partial interval without inventing missing date
   expect(result.audit.missingDates).toHaveLength(11);
   expect(result.audit.missingDates).toContain('2026-07-11');
   expect(result.audit.missingDates).toContain('2026-08-10');
+  expect(result.dates).toHaveLength(20);
+  expect(result.dates[0]).toBe('12/07/2026');
+  expect(result.dates.at(-1)).toBe('31/07/2026');
+  expect(result.dates).not.toContain('11/07/2026');
+  expect(result.rowLengths.every(n=>n===22)).toBeTruthy();
+});
+
+test('RC56 deduplicates repeated calendar dates without shifting employee codes', async ({ page }) => {
+  await openApp(page);
+  const result=await page.evaluate(async ({rows})=>{
+    const duplicateCol=18;
+    rows[6].splice(duplicateCol+1,0,rows[6][duplicateCol]);
+    rows[7].splice(duplicateCol+1,0,rows[7][duplicateCol]);
+    for(let r=8;r<rows.length;r++)rows[r].splice(duplicateCol+1,0,'D');
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Escala Mensal');
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['T1 | 07:00 às 16:00']]),'Configuração');
+    const file=new File([XLSX.write(wb,{bookType:'xlsm',type:'array'})],'Escala ML10 duplicada.xlsm');
+    const normalized=await window.ADERENCIA_SCHEDULE_RESILIENCE.resilient(file,{store:'ML10',start:'2026-07-11',end:'2026-08-10'});
+    const parsed=XLSX.read(await normalized.arrayBuffer(),{type:'array',cellDates:true});
+    const out=XLSX.utils.sheet_to_json(parsed.Sheets['Escala Ponto'],{header:1,defval:'',raw:false});
+    const header=out[2],employee=out.find(r=>r[0]==='FUNCIONARIO TESTE 01');
+    const july15=header.indexOf('15/07/2026'),july16=header.indexOf('16/07/2026');
+    return {
+      headerLength:header.length,
+      employeeLength:employee.length,
+      dateCount:header.slice(2).length,
+      uniqueDateCount:new Set(header.slice(2)).size,
+      july15:employee[july15],
+      july16:employee[july16],
+      audit:window.ADERENCIA_SCHEDULE_RESILIENCE.last
+    };
+  },{rows:julyLayout()});
+  expect(result.dateCount).toBe(21);
+  expect(result.uniqueDateCount).toBe(21);
+  expect(result.employeeLength).toBe(result.headerLength);
+  expect(result.july15).toBe('D');
+  expect(result.july16).toBe('T1');
+  expect(result.audit.exactDateDays).toBe(21);
 });
