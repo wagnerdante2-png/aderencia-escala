@@ -2,12 +2,12 @@ const { test, expect } = require('@playwright/test');
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/index.html');
-  await page.waitForFunction(() => window.ADERENCIA_SCHEDULE_RECOVERY_R2 && window.XLSX);
+  await page.waitForFunction(() => window.ADERENCIA_SCHEDULE_RECOVERY_R3 && window.XLSX);
 });
 
-test('RC58 R2 keeps the real June calendar across horizontally split PDF pages', async ({ page }) => {
+test('RC58 R3 keeps the real June calendar across horizontally split PDF pages', async ({ page }) => {
   const out = await page.evaluate(() => {
-    const api = window.ADERENCIA_SCHEDULE_RECOVERY_R2;
+    const api = window.ADERENCIA_SCHEDULE_RECOVERY_R3;
     const ctx = { start:'2026-06-11', end:'2026-07-10' };
     const a = api.alignRawDays(Array.from({length:17},(_,i)=>i+1), ctx, 'continuação da grade', 'ESCALA JUNHO 2026');
     const b = api.alignRawDays(Array.from({length:13},(_,i)=>i+18), ctx, 'continuação da grade', 'ESCALA JUNHO 2026');
@@ -17,9 +17,9 @@ test('RC58 R2 keeps the real June calendar across horizontally split PDF pages',
   expect(out).toEqual({a:7,b:13,total:20,first:'2026-06-11',last:'2026-06-30'});
 });
 
-test('RC58 R2 reconciles names split across cells using the validated point roster', async ({ page }) => {
+test('RC58 R3 reconciles names split across cells using the validated point roster', async ({ page }) => {
   const out = await page.evaluate(() => {
-    const api = window.ADERENCIA_SCHEDULE_RECOVERY_R2;
+    const api = window.ADERENCIA_SCHEDULE_RECOVERY_R3;
     const roster = [
       {name:'ANA PAULA DE SOUZA',key:'ANA PAULA SOUZA'},
       {name:'CARLOS EDUARDO LIMA',key:'CARLOS EDUARDO LIMA'}
@@ -30,9 +30,9 @@ test('RC58 R2 reconciles names split across cells using the validated point rost
   expect(out.score).toBeGreaterThan(.9);
 });
 
-test('RC58 R2 carries employee identity to a horizontal continuation page without repeated names', async ({ page }) => {
+test('RC58 R3 carries employee identity to a horizontal continuation page without repeated names', async ({ page }) => {
   const out = await page.evaluate(() => {
-    const api = window.ADERENCIA_SCHEDULE_RECOVERY_R2;
+    const api = window.ADERENCIA_SCHEDULE_RECOVERY_R3;
     const roster = [
       {name:'ANA SILVA',key:'ANA SILVA'},
       {name:'BRUNO LIMA',key:'BRUNO LIMA'},
@@ -49,9 +49,9 @@ test('RC58 R2 carries employee identity to a horizontal continuation page withou
   expect(out).toEqual(['ANA SILVA','BRUNO LIMA','CARLA SOUZA']);
 });
 
-test('RC58 R2 normalizes a heterogeneous June XLSM with no conventional Nome header', async ({ page }) => {
+test('RC58 R3 normalizes a heterogeneous June XLSM with no conventional Nome header', async ({ page }) => {
   const out = await page.evaluate(async () => {
-    const api = window.ADERENCIA_SCHEDULE_RECOVERY_R2;
+    const api = window.ADERENCIA_SCHEDULE_RECOVERY_R3;
     const days = Array.from({length:30},(_,i)=>i+1);
     const rows = [
       ['ML40','JUNHO 2026'],
@@ -78,14 +78,16 @@ test('RC58 R2 normalizes a heterogeneous June XLSM with no conventional Nome hea
   expect(out.density).toBeGreaterThan(.8);
 });
 
-test('RC58 R2 recovery is active before the legacy PDF parser', async ({ page }) => {
+test('RC58 R3 recovery is active before the legacy PDF parser and R2 stays retired', async ({ page }) => {
   const state = await page.evaluate(() => ({
     active: window.ADERENCIA_ACTIVE_MODULES,
-    version: window.ADERENCIA_SCHEDULE_RECOVERY_R2?.version
+    version: window.ADERENCIA_SCHEDULE_RECOVERY_R3?.version
   }));
-  expect(state.version).toBe('RC58-R2');
+  expect(state.version).toBe('RC58-R3');
+  const r3 = state.active.indexOf('schedule-recovery-r3.js');
   const r2 = state.active.indexOf('schedule-recovery-r2.js');
   const legacy = state.active.indexOf('pdf-schedule-parser-rc58.js');
-  expect(r2).toBeGreaterThan(-1);
-  expect(legacy).toBeGreaterThan(r2);
+  expect(r3).toBeGreaterThan(-1);
+  expect(r2).toBe(-1);
+  expect(legacy).toBeGreaterThan(r3);
 });
