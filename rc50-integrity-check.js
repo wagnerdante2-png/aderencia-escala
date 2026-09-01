@@ -6,7 +6,9 @@ function run(){
  const active=window.ADERENCIA_ACTIVE_MODULES||[];
  add('active-modules',Array.isArray(active)&&active.length>10,`${active.length} módulos`);
  add('no-duplicate-modules',new Set(active).size===active.length);
- const r3Index=active.indexOf('schedule-recovery-r3.js'),r2Index=active.indexOf('schedule-recovery-r2.js'),legacyParserIndex=active.indexOf('pdf-schedule-parser-rc58.js'),conflictIndex=active.indexOf('schedule-conflict-guard-rc58.js'),storeIntegrityIndex=active.indexOf('schedule-store-integrity-rc58.js'),preprocessIndex=active.indexOf('schedule-preprocess-rc52.js'),pointSemanticsIndex=active.indexOf('point-semantics.js'),pointStoreIndex=active.indexOf('point-store-integrity-rc58.js');
+ const realGridIndex=active.indexOf('schedule-real-grid-recovery-rc58.js'),r3Index=active.indexOf('schedule-recovery-r3.js'),r2Index=active.indexOf('schedule-recovery-r2.js'),legacyParserIndex=active.indexOf('pdf-schedule-parser-rc58.js'),conflictIndex=active.indexOf('schedule-conflict-guard-rc58.js'),storeIntegrityIndex=active.indexOf('schedule-store-integrity-rc58.js'),preprocessIndex=active.indexOf('schedule-preprocess-rc52.js'),pointSemanticsIndex=active.indexOf('point-semantics.js'),pointStoreIndex=active.indexOf('point-store-integrity-rc58.js');
+ add('schedule-real-grid-recovery',window.ADERENCIA_SCHEDULE_REAL_GRID?.version==='RC58-S1',window.ADERENCIA_SCHEDULE_REAL_GRID?.version||'ausente');
+ add('schedule-real-grid-order',realGridIndex>=0&&r3Index>realGridIndex,`real=${realGridIndex}; R3=${r3Index}`);
  add('schedule-recovery-r3',window.ADERENCIA_SCHEDULE_RECOVERY_R3?.version==='RC58-R3',window.ADERENCIA_SCHEDULE_RECOVERY_R3?.version||'ausente');
  add('schedule-recovery-r2-retired',r2Index===-1&&!window.ADERENCIA_SCHEDULE_RECOVERY_R2,r2Index===-1?'inativo':'ativo');
  add('schedule-recovery-order',r3Index>=0&&legacyParserIndex>r3Index,`R3=${r3Index}; parser=${legacyParserIndex}`);
