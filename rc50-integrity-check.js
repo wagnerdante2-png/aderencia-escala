@@ -30,7 +30,7 @@ function run(){
  add('schedule-resilience',/^RC56(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_RESILIENCE?.version||''),window.ADERENCIA_SCHEDULE_RESILIENCE?.version||'ausente');
  add('schedule-reconciliation',/^RC57(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_RECONCILIATION?.version||''),window.ADERENCIA_SCHEDULE_RECONCILIATION?.version||'ausente');
  add('schedule-reconciliation-rc58',/^RC58(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_RECONCILIATION_RC58?.version||''),window.ADERENCIA_SCHEDULE_RECONCILIATION_RC58?.version||'ausente');
- add('schedule-conflict-guard',window.ADERENCIA_SCHEDULE_CONFLICT_GUARD?.version==='RC58.1',window.ADERENCIA_SCHEDULE_CONFLICT_GUARD?.version||'ausente');
+ add('schedule-conflict-guard',window.ADERENCIA_SCHEDULE_CONFLICT_GUARD?.version==='RC58.2',window.ADERENCIA_SCHEDULE_CONFLICT_GUARD?.version||'ausente');
  add('schedule-store-integrity',window.ADERENCIA_SCHEDULE_STORE_INTEGRITY?.version==='RC58.2',window.ADERENCIA_SCHEDULE_STORE_INTEGRITY?.version||'ausente');
  add('schedule-store-integrity-order',conflictIndex>=0&&storeIntegrityIndex>conflictIndex&&preprocessIndex>storeIntegrityIndex,`conflict=${conflictIndex}; store=${storeIntegrityIndex}; preprocess=${preprocessIndex}`);
  add('schedule-preprocess',/^RC52(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_PREPROCESS?.version||''),window.ADERENCIA_SCHEDULE_PREPROCESS?.version||'ausente');
