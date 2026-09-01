@@ -18,6 +18,7 @@ function run(){
  add('pdf-no-eval',window.ADERENCIA_PDF_SECURITY?.isEvalSupported===false);
  add('pdf-no-scripting',window.ADERENCIA_PDF_SECURITY?.enableScripting===false);
  add('point-store-integrity',window.ADERENCIA_POINT_STORE_INTEGRITY?.version==='RC58.4',window.ADERENCIA_POINT_STORE_INTEGRITY?.version||'ausente');
+ add('point-store-race-guard',window.ADERENCIA_POINT_STORE_INTEGRITY?.raceVersion==='RC58.5'&&Number.isInteger(window.ADERENCIA_POINT_STORE_INTEGRITY?.selection)&&typeof window.ADERENCIA_POINT_STORE_INTEGRITY?.busy==='boolean',window.ADERENCIA_POINT_STORE_INTEGRITY?.raceVersion||'ausente');
  add('point-store-integrity-order',pointSemanticsIndex>=0&&pointStoreIndex>pointSemanticsIndex,`semantics=${pointSemanticsIndex}; store=${pointStoreIndex}`);
  add('history',!!window.ADERENCIA_HISTORY);
  add('period-api',!!window.ADERENCIA_PERIOD);

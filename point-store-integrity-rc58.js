@@ -2,13 +2,14 @@
 'use strict';
 if(window.__ADERENCIA_POINT_STORE_INTEGRITY_RC58__||!window.pdfjsLib)return;
 window.__ADERENCIA_POINT_STORE_INTEGRITY_RC58__=true;
-const input=document.getElementById('pointFile');
+const input=document.getElementById('pointFile'),resetBtn=document.getElementById('resetBtn');
 if(!input)return;
-const VERSION='RC58.4';
-let bypass=false;
+const VERSION='RC58.4',RACE_VERSION='RC58.5';
+let bypass=false,selectionSeq=0,busy=false;
 const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 function registrationKey(v){const n=norm(v).replace(/\s+/g,'');return /^\d+$/.test(n)?n.replace(/^0+(?=\d)/,''):n}
 function status(text,ok=false){const e=document.getElementById('pointStatus');if(!e)return;e.textContent=text;e.classList.remove('muted','ok','error');e.classList.add(ok?'ok':'error')}
+function setBusy(value){busy=!!value;input.disabled=busy;input.setAttribute('aria-busy',busy?'true':'false')}
 function storeCode(n){return `ML${String(+n).padStart(2,'0')}`}
 function parseBrDate(value){
  const m=String(value||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);if(!m)return null;
@@ -89,29 +90,34 @@ async function scan(file){
    }
  }
  const periodErrors=periodObservations.filter(x=>!x.valid);
- return {
-   stores:[...new Set(observations.map(x=>x.store))],
-   periods:[...new Set(periodObservations.map(x=>x.period))],
-   observations,periodObservations,periodErrors,identityObservations,identityConflicts,registrationConflicts,duplicateDays,dayConflicts,dayDateErrors
- };
+ return {stores:[...new Set(observations.map(x=>x.store))],periods:[...new Set(periodObservations.map(x=>x.period))],observations,periodObservations,periodErrors,identityObservations,identityConflicts,registrationConflicts,duplicateDays,dayConflicts,dayDateErrors};
 }
-function clearStaleEngineState(){
+function dispatchToEngine(){bypass=true;try{input.dispatchEvent(new Event('change',{bubbles:true}))}finally{bypass=false}}
+function invalidateCurrentPoint(){
  input.value='';
  window.ADERENCIA_POINT_CONTEXT={store:null,start:null,end:null};
- bypass=true;
- try{input.dispatchEvent(new Event('change',{bubbles:true}))}finally{bypass=false}
+ dispatchToEngine();
+ const calc=document.getElementById('calculateBtn');if(calc)calc.disabled=true;
+ document.getElementById('resultCard')?.classList.add('hidden');
 }
+function restoreInputFile(file){const dt=new DataTransfer();dt.items.add(file);input.files=dt.files}
 function marksText(marks){return marks.length?marks.join(', '):'sem batidas'}
-async function inspect(file){
+async function waitEngine(seq){
+ while(seq===selectionSeq){
+   const text=document.getElementById('pointStatus')?.textContent||'';
+   if(!text.startsWith('Lendo espelho...'))return true;
+   await new Promise(r=>setTimeout(r,25));
+ }
+ return false;
+}
+async function inspect(file,seq){
  try{
-   const result=await scan(file);
+   const result=await scan(file);if(seq!==selectionSeq)return;
    const mixedStores=result.stores.length>1,periodFormat=result.periodErrors.length>0,mixedPeriods=result.periods.length>1,ambiguousIdentity=result.identityConflicts.length>0||result.registrationConflicts.length>0,invalidDayDate=result.dayDateErrors.length>0,conflictingDay=result.dayConflicts.length>0;
    const blocked=mixedStores||periodFormat||mixedPeriods||ambiguousIdentity||invalidDayDate||conflictingDay;
    const reason=mixedStores?'stores':periodFormat?'period-format':mixedPeriods?'periods':ambiguousIdentity?'identities':invalidDayDate?'day-dates':conflictingDay?'days':null;
-   const last={source:file.name,...result,blocked,reason,at:new Date().toISOString()};
-   window.ADERENCIA_POINT_STORE_INTEGRITY.last=last;
+   window.ADERENCIA_POINT_STORE_INTEGRITY.last={source:file.name,...result,blocked,reason,selection:seq,at:new Date().toISOString()};
    if(blocked){
-     clearStaleEngineState();
      if(mixedStores)status(`Erro: espelho mistura lojas em Departamento/Lotação (${result.stores.join(' × ')}). Use um espelho de uma única loja.`,false);
      else if(periodFormat){const c=result.periodErrors[0];status(c.reason==='reversed'?`Erro: espelho contém intervalo de período invertido (${c.period}).`:`Erro: espelho contém data inválida no período (${c.period}).`,false)}
      else if(mixedPeriods)status(`Erro: espelho contém períodos diferentes (${result.periods.join(' × ')}). Use um espelho de um único período.`,false);
@@ -119,23 +125,28 @@ async function inspect(file){
      else if(result.registrationConflicts.length){const c=result.registrationConflicts[0];status(`Erro: espelho contém a matrícula ${c.registration} associada a nomes diferentes (${c.names.join(' × ')}).`,false)}
      else if(invalidDayDate){const c=result.dayDateErrors[0];status(`Erro: espelho contém data diária inválida para ${c.name} (${c.date}).`,false)}
      else {const c=result.dayConflicts[0];status(`Erro: espelho contém marcações conflitantes para ${c.first.name} em ${c.first.date} (${marksText(c.first.marks)} × ${marksText(c.incoming.marks)}).`,false)}
-     return;
+     setBusy(false);return;
    }
-   bypass=true;
-   try{input.dispatchEvent(new Event('change',{bubbles:true}))}finally{bypass=false}
+   restoreInputFile(file);dispatchToEngine();
+   await waitEngine(seq);if(seq===selectionSeq)setBusy(false);
  }catch(error){
-   window.ADERENCIA_POINT_STORE_INTEGRITY.last={source:file?.name||'',stores:[],periods:[],blocked:false,scanError:String(error?.message||error),at:new Date().toISOString()};
-   bypass=true;
-   try{input.dispatchEvent(new Event('change',{bubbles:true}))}finally{bypass=false}
+   if(seq!==selectionSeq)return;
+   window.ADERENCIA_POINT_STORE_INTEGRITY.last={source:file?.name||'',stores:[],periods:[],blocked:false,scanError:String(error?.message||error),selection:seq,at:new Date().toISOString()};
+   restoreInputFile(file);dispatchToEngine();
+   await waitEngine(seq);if(seq===selectionSeq)setBusy(false);
  }
 }
 document.addEventListener('change',e=>{
  if(e.target!==input||bypass)return;
- const file=input.files?.[0];
- if(!file||!file.name.toLowerCase().endsWith('.pdf'))return;
+ const file=input.files?.[0],seq=++selectionSeq;
+ if(!file||!file.name.toLowerCase().endsWith('.pdf')){setBusy(false);return}
  e.stopImmediatePropagation();e.preventDefault();
- status('Validando integridade do espelho...',false);
- inspect(file);
+ setBusy(true);invalidateCurrentPoint();status('Validando integridade do espelho...',false);inspect(file,seq);
 },true);
-window.ADERENCIA_POINT_STORE_INTEGRITY={version:VERSION,scan,detectPointStore,detectPointPeriod,detectPointPeriodInfo,detectPointIdentity,registrationKey,parseBrDate,last:null};
+document.addEventListener('click',e=>{
+ if(e.target!==resetBtn)return;
+ selectionSeq++;
+ if(busy){e.preventDefault();e.stopImmediatePropagation();window.location.reload()}
+},true);
+window.ADERENCIA_POINT_STORE_INTEGRITY={version:VERSION,raceVersion:RACE_VERSION,scan,detectPointStore,detectPointPeriod,detectPointPeriodInfo,detectPointIdentity,registrationKey,parseBrDate,get selection(){return selectionSeq},get busy(){return busy},last:null};
 })();
