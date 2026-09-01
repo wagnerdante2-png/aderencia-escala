@@ -22,6 +22,31 @@ test('RC58-R3 intercepta a escala antes dos parsers legados', async ({ page }) =
   expect(order.r2).toBe(-1);
 });
 
+test('RC58-R3 tem prioridade real de captura sobre o parser PDF legado', async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => {
+    window.ADERENCIA_ENGINE = {
+      version: window.ADERENCIA_ENGINE?.version || 'test',
+      point: {
+        store: 'ML11',
+        periodStart: '2026-06-11',
+        periodEnd: '2026-07-10',
+        employees: new Map([['ANA TESTE',{name:'ANA TESTE'}]])
+      }
+    };
+    window.ADERENCIA_SCHEDULE_RECOVERY_R3.lastError = null;
+    const file = new File([new Uint8Array([37,80,68,70,45,49,46,52,10])], 'prioridade-r3.pdf', {type:'application/pdf'});
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    const input = document.getElementById('scheduleFile');
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+  await page.waitForFunction(() => window.ADERENCIA_SCHEDULE_RECOVERY_R3.lastError?.file === 'prioridade-r3.pdf');
+  const error = await page.evaluate(() => window.ADERENCIA_SCHEDULE_RECOVERY_R3.lastError);
+  expect(error.file).toBe('prioridade-r3.pdf');
+});
+
 test('RC58-R3 preserva virada Junho para Julho em grade 1..30,1', async ({ page }) => {
   await openApp(page);
   const result = await page.evaluate(() => {
