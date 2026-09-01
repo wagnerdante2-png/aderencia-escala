@@ -82,15 +82,21 @@ async function scan(file){
      const dm=line.match(/^(\d{2}\/\d{2}\/\d{4})\b/);if(!dm)continue;
      const parsedDate=parseBrDate(dm[1]);
      if(!parsedDate){dayDateErrors.push({page:p,name:cur.name,registration:cur.registration,date:dm[1],text:line});continue}
-     const date=parsedDate.raw,marks=pointMarks(line),id=`${cur.key}|${date}`,incoming={page:p,name:cur.name,registration:cur.registration,date,marks,text:line};
+     const date=parsedDate.raw,marks=pointMarks(line),id=`${cur.key}|${date}`,incoming={page:p,name:cur.name,key:cur.key,registration:cur.registration,date,iso:parsedDate.iso,marks,text:line};
      const prior=dayLedger.get(id);
      if(!prior){dayLedger.set(id,incoming);continue}
-     if(sameMarks(prior.marks,marks)){duplicateDays.push({kind:'identical',first:prior,incoming});continue}
+     if(sameMarks(prior.marks,marks)){duplicateDays.push({kind:'identical',first:prior,incoming,resolved:prior});continue}
+     if(!prior.marks.length||!marks.length){
+       const resolved=prior.marks.length?prior:incoming;
+       duplicateDays.push({kind:'sparse',first:prior,incoming,resolved});
+       if(resolved===incoming)dayLedger.set(id,incoming);
+       continue;
+     }
      dayConflicts.push({kind:'marks',first:prior,incoming});
    }
  }
  const periodErrors=periodObservations.filter(x=>!x.valid);
- return {stores:[...new Set(observations.map(x=>x.store))],periods:[...new Set(periodObservations.map(x=>x.period))],observations,periodObservations,periodErrors,identityObservations,identityConflicts,registrationConflicts,duplicateDays,dayConflicts,dayDateErrors};
+ return {stores:[...new Set(observations.map(x=>x.store))],periods:[...new Set(periodObservations.map(x=>x.period))],observations,periodObservations,periodErrors,identityObservations,identityConflicts,registrationConflicts,duplicateDays,dayConflicts,dayDateErrors,resolvedDays:[...dayLedger.values()]};
 }
 function dispatchToEngine(){bypass=true;try{input.dispatchEvent(new Event('change',{bubbles:true}))}finally{bypass=false}}
 function invalidateCurrentPoint(){
@@ -110,6 +116,27 @@ async function waitEngine(seq){
  }
  return false;
 }
+function reconcileSparseDays(result){
+ const point=window.ADERENCIA_ENGINE?.point;
+ if(!point||!Array.isArray(result?.resolvedDays))return 0;
+ let repaired=0;
+ for(const resolved of result.resolvedDays){
+   if(!resolved?.marks?.length)continue;
+   const emp=point.employees?.get?.(resolved.key||norm(resolved.name));
+   if(!emp?.days)continue;
+   const date=resolved.iso||parseBrDate(resolved.date)?.iso;
+   if(!date)continue;
+   const current=emp.days.get(date);
+   if(current?.marks?.length)continue;
+   emp.days.set(date,{date,firstEntry:resolved.marks[0]||null,marks:resolved.marks.slice(),raw:resolved.text||current?.raw||''});
+   repaired++;
+ }
+ if(repaired){
+   let marks=0;for(const emp of point.employees.values())for(const day of emp.days.values())marks+=day.marks?.length||0;
+   status(`Reconhecido: ${point.employees.size} funcionário(s) • ${point.store} • ${marks} marcações`,true);
+ }
+ return repaired;
+}
 async function inspect(file,seq){
  try{
    const result=await scan(file);if(seq!==selectionSeq)return;
@@ -128,7 +155,12 @@ async function inspect(file,seq){
      setBusy(false);return;
    }
    restoreInputFile(file);dispatchToEngine();
-   await waitEngine(seq);if(seq===selectionSeq)setBusy(false);
+   await waitEngine(seq);
+   if(seq===selectionSeq){
+     const repairedSparseDays=reconcileSparseDays(result);
+     if(window.ADERENCIA_POINT_STORE_INTEGRITY.last)window.ADERENCIA_POINT_STORE_INTEGRITY.last.repairedSparseDays=repairedSparseDays;
+     setBusy(false);
+   }
  }catch(error){
    if(seq!==selectionSeq)return;
    window.ADERENCIA_POINT_STORE_INTEGRITY.last={source:file?.name||'',stores:[],periods:[],blocked:false,scanError:String(error?.message||error),selection:seq,at:new Date().toISOString()};
@@ -148,5 +180,5 @@ document.addEventListener('click',e=>{
  selectionSeq++;
  if(busy){e.preventDefault();e.stopImmediatePropagation();window.location.reload()}
 },true);
-window.ADERENCIA_POINT_STORE_INTEGRITY={version:VERSION,raceVersion:RACE_VERSION,scan,detectPointStore,detectPointPeriod,detectPointPeriodInfo,detectPointIdentity,registrationKey,parseBrDate,get selection(){return selectionSeq},get busy(){return busy},last:null};
+window.ADERENCIA_POINT_STORE_INTEGRITY={version:VERSION,raceVersion:RACE_VERSION,duplicatePolicy:'prefer-populated',scan,detectPointStore,detectPointPeriod,detectPointPeriodInfo,detectPointIdentity,registrationKey,parseBrDate,get selection(){return selectionSeq},get busy(){return busy},last:null};
 })();
