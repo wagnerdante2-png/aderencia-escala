@@ -119,6 +119,66 @@ test('XLSX cache bypasses non-finite numeric option keys', async ({ page }) => {
   });
 });
 
+test('File cache returns independent buffers while reusing the cached master bytes', async ({ page }) => {
+  await page.goto('/index.html');
+  const result = await page.evaluate(async () => {
+    const code = await fetch('/runtime-cache-rc47.js').then(r => r.text());
+    const frame = document.createElement('iframe');
+    document.body.appendChild(frame);
+    const w = frame.contentWindow;
+    w.eval(code);
+    const file = new w.File([new Uint8Array([10,20,30,40])], 'cache.bin');
+    const first = await file.arrayBuffer();
+    const second = await file.arrayBuffer();
+    const snapshot = {
+      independent: first !== second,
+      firstBytes: Array.from(new Uint8Array(first)),
+      secondBytes: Array.from(new Uint8Array(second)),
+      stats: {
+        hits: w.ADERENCIA_RUNTIME_CACHE.stats.fileHits,
+        misses: w.ADERENCIA_RUNTIME_CACHE.stats.fileMisses
+      }
+    };
+    frame.remove();
+    return snapshot;
+  });
+  expect(result.independent).toBeTruthy();
+  expect(result.firstBytes).toEqual([10,20,30,40]);
+  expect(result.secondBytes).toEqual([10,20,30,40]);
+  expect(result.stats).toEqual({hits:1,misses:1});
+});
+
+test('File cache survives a consumer detaching one returned ArrayBuffer', async ({ page }) => {
+  await page.goto('/index.html');
+  const result = await page.evaluate(async () => {
+    const code = await fetch('/runtime-cache-rc47.js').then(r => r.text());
+    const frame = document.createElement('iframe');
+    document.body.appendChild(frame);
+    const w = frame.contentWindow;
+    w.eval(code);
+    const file = new w.File([new Uint8Array([1,2,3,4,5])], 'transfer.bin');
+    const first = await file.arrayBuffer();
+    w.structuredClone(first,{transfer:[first]});
+    const detachedLength = first.byteLength;
+    const second = await file.arrayBuffer();
+    const snapshot = {
+      detachedLength,
+      secondLength: second.byteLength,
+      secondBytes: Array.from(new Uint8Array(second)),
+      stats: {
+        hits: w.ADERENCIA_RUNTIME_CACHE.stats.fileHits,
+        misses: w.ADERENCIA_RUNTIME_CACHE.stats.fileMisses
+      }
+    };
+    frame.remove();
+    return snapshot;
+  });
+  expect(result.detachedLength).toBe(0);
+  expect(result.secondLength).toBe(5);
+  expect(result.secondBytes).toEqual([1,2,3,4,5]);
+  expect(result.stats).toEqual({hits:1,misses:1});
+});
+
 test('runtime cache clear invalidates file, XLSX and PDF caches', async ({ page }) => {
   await page.goto('/index.html');
   const result = await page.evaluate(async () => {
@@ -156,27 +216,29 @@ test('runtime cache clear invalidates file, XLSX and PDF caches', async ({ page 
     const pdf2 = w.ADERENCIA_PDF_OPEN(bytes);
 
     const file = new w.File([bytes], 'cache.bin');
-    const file1 = file.arrayBuffer();
-    const file2 = file.arrayBuffer();
+    const fileBuf1 = await file.arrayBuffer();
+    const fileBuf2 = await file.arrayBuffer();
 
     w.ADERENCIA_RUNTIME_CACHE.clear();
 
     const wb3 = w.XLSX.read(bytes, { type: 'array' });
     const pdf3 = w.ADERENCIA_PDF_OPEN(bytes);
-    const file3 = file.arrayBuffer();
+    const fileBuf3 = await file.arrayBuffer();
 
     const snapshot = {
       beforeClear: {
         xlsxHit: wb1 === wb2,
         pdfHit: pdf1 === pdf2,
-        fileHit: file1 === file2
+        fileBuffersIndependent: fileBuf1 !== fileBuf2,
+        fileBytesEqual: Array.from(new Uint8Array(fileBuf1)).join(',') === Array.from(new Uint8Array(fileBuf2)).join(',')
       },
       afterClear: {
         xlsxInvalidated: wb1 !== wb3,
         pdfInvalidated: pdf1 !== pdf3,
-        fileInvalidated: file1 !== file3
+        fileStillReadable: Array.from(new Uint8Array(fileBuf3)).join(',') === '1,2,3,4'
       },
       calls: { xlsx: xlsxCalls.length, pdf: pdfCalls.length },
+      fileStats: {hits:w.ADERENCIA_RUNTIME_CACHE.stats.fileHits,misses:w.ADERENCIA_RUNTIME_CACHE.stats.fileMisses},
       clearedAt: w.ADERENCIA_RUNTIME_CACHE.stats.clearedAt || null
     };
 
@@ -184,8 +246,9 @@ test('runtime cache clear invalidates file, XLSX and PDF caches', async ({ page 
     return snapshot;
   });
 
-  expect(result.beforeClear).toEqual({ xlsxHit: true, pdfHit: true, fileHit: true });
-  expect(result.afterClear).toEqual({ xlsxInvalidated: true, pdfInvalidated: true, fileInvalidated: true });
+  expect(result.beforeClear).toEqual({ xlsxHit: true, pdfHit: true, fileBuffersIndependent: true, fileBytesEqual: true });
+  expect(result.afterClear).toEqual({ xlsxInvalidated: true, pdfInvalidated: true, fileStillReadable: true });
   expect(result.calls).toEqual({ xlsx: 2, pdf: 2 });
+  expect(result.fileStats).toEqual({hits:1,misses:2});
   expect(result.clearedAt).toBeTruthy();
 });

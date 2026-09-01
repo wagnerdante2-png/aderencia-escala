@@ -8,11 +8,11 @@ if(window.File?.prototype?.arrayBuffer){
   const original=File.prototype.arrayBuffer;
   File.prototype.arrayBuffer=function(){
     let p=fileBuffers.get(this);
-    if(p){stats.fileHits++;return p}
+    if(p){stats.fileHits++;return p.then(master=>master.slice(0))}
     stats.fileMisses++;
-    p=Promise.resolve(original.call(this)).catch(err=>{fileBuffers.delete(this);throw err});
+    p=Promise.resolve(original.call(this)).then(buffer=>buffer.slice(0)).catch(err=>{fileBuffers.delete(this);throw err});
     fileBuffers.set(this,p);
-    return p;
+    return p.then(master=>master.slice(0));
   };
 }
 /*
