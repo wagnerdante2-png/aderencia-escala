@@ -30,6 +30,79 @@ test('RC58 registra turno sem legenda e motor exclui as marcações afetadas sem
   expect(state.engine).toContain('turno sem horário conhecido foram excluídos do cálculo; nenhum horário foi inferido');
 });
 
+test('motor exclui de fato do denominador um turno sem horário no fluxo real de arquivos', async ({ page }) => {
+  await page.waitForFunction(() => !!window.jspdf?.jsPDF && !!window.XLSX);
+  const result = await page.evaluate(async () => {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF();
+    pdf.setFontSize(10);
+    const lines = [
+      'Espelho do Ponto 11/07/2026 - 13/07/2026',
+      'Matrícula: 1 Nome: ANA TESTE Chapa: 1 Admissão: 01/01/2020',
+      'Função: 1 - OPERADOR DE LOJA I C.C. 1',
+      'Departamento: LOJA ML10',
+      'Data Dia 1a E.',
+      '11/07/2026 SAB 08:00 O 12:00 I 13:00 O 17:00 I',
+      '12/07/2026 DOM 09:00 O 12:00 I 13:00 O 18:00 I',
+      '13/07/2026 SEG 08:00 O 12:00 I 13:00 O 17:00 I',
+      'Horários'
+    ];
+    lines.forEach((line, i) => pdf.text(line, 10, 15 + i * 7));
+    const pointFile = new File([pdf.output('arraybuffer')], 'espelho-ml10.pdf', { type:'application/pdf' });
+    const pointDT = new DataTransfer();
+    pointDT.items.add(pointFile);
+    const pointInput = document.getElementById('pointFile');
+    pointInput.files = pointDT.files;
+    pointInput.dispatchEvent(new Event('change', { bubbles:true }));
+
+    const wait = async predicate => {
+      const limit = Date.now() + 5000;
+      while (Date.now() < limit) {
+        if (predicate()) return;
+        await new Promise(r => setTimeout(r, 25));
+      }
+      throw new Error('timeout aguardando processamento E2E');
+    };
+    await wait(() => document.getElementById('pointStatus').textContent.includes('Reconhecido:'));
+
+    const rows = [
+      ['ESCALA OPERACIONAL | LOJA ML10'],
+      ['Nome','Cargo','11/07/2026','12/07/2026','13/07/2026'],
+      ['ANA TESTE','OPERADOR DE LOJA I','T1','T7','T1'],
+      [],
+      ['T1 | 08:00 às 17:00']
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Escala Ponto');
+    const scheduleFile = new File([XLSX.write(wb, { bookType:'xlsx', type:'array' })], 'Escala ML10.xlsx');
+    const scheduleDT = new DataTransfer();
+    scheduleDT.items.add(scheduleFile);
+    const scheduleInput = document.getElementById('scheduleFile');
+    scheduleInput.files = scheduleDT.files;
+    scheduleInput.dispatchEvent(new Event('change', { bubbles:true }));
+    await wait(() => document.getElementById('scheduleStatus').textContent.includes('Reconhecida:'));
+
+    document.getElementById('calculateBtn').click();
+    await wait(() => !!window.ADERENCIA_LAST_CALCULATION);
+    const calc = window.ADERENCIA_LAST_CALCULATION;
+    return {
+      total: calc.total,
+      unresolvedDays: calc.unresolvedDays,
+      unresolvedMarks: calc.unresolvedMarks,
+      adherence: calc.adherence,
+      warning: document.getElementById('warnings').textContent,
+      resultTotal: document.getElementById('totalMarks').textContent
+    };
+  });
+  expect(result.total).toBe(8);
+  expect(result.unresolvedDays).toBe(1);
+  expect(result.unresolvedMarks).toBe(4);
+  expect(result.adherence).toBe(100);
+  expect(result.resultTotal).toBe('8');
+  expect(result.warning).toContain('turno sem horário conhecido');
+  expect(result.warning).toContain('excluídos do cálculo');
+});
+
 test('calendário PDF mensal de julho produz interseção proporcional 21 de 31 dias', async ({ page }) => {
   const out = await page.evaluate(() => {
     const expected = [];
