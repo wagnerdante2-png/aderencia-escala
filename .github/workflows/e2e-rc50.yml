@@ -1,28 +1,49 @@
 name: RC50 End-to-End
 
 on:
-  push:
-    branches: [rc50-e2e-hardening, rc50-main-consolidation, main, fix-partial-cycle-rc55-20260831]
   workflow_dispatch:
+  push:
+    branches:
+      - fix-partial-cycle-rc55-20260831
 
 permissions:
   contents: read
 
 jobs:
   e2e:
+    name: Integrity and browser flow
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - run: npm install
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e:chromium
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install test dependencies
+        run: npm ci
+
+      - name: Report Playwright version
+        run: npx --no-install playwright --version
+
+      - name: Install Chromium
+        run: npx --no-install playwright install chromium
+
+      - name: Run RC50 integrity check
+        run: node rc50-integrity-check.js
+
+      - name: Run npm run test:e2e:chromium
+        run: npm run test:e2e:chromium
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-report-rc50
-          path: playwright-report/
+          path: playwright-report
+          if-no-files-found: ignore
           retention-days: 14

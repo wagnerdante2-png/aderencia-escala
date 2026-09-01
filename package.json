@@ -1,13 +1,14 @@
 {
-  "name": "aderencia-escala-e2e",
-  "private": true,
+  "name": "aderencia-escala",
   "version": "1.0.0-rc58",
+  "private": true,
+  "description": "Validador local de aderência de escala.",
   "scripts": {
-    "serve": "python3 -m http.server 4173",
+    "serve:test": "python -m http.server 4173 --bind 127.0.0.1",
     "test:e2e": "playwright test",
     "test:e2e:chromium": "playwright test --project=chromium"
   },
   "devDependencies": {
-    "@playwright/test": "^1.55.0"
+    "@playwright/test": "1.55.0"
   }
 }
