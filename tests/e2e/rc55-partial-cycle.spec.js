@@ -39,6 +39,8 @@ test('RC55 accepts exact partial intersection 11/07-31/07 for a 11/07-10/08 poin
   expect(result.audit.partial).toBeTruthy();
   expect(result.audit.expectedDays).toBe(31);
   expect(result.audit.exactDateDays).toBe(21);
+  expect(result.audit.partialStart).toBe('2026-07-11');
+  expect(result.audit.partialEnd).toBe('2026-07-31');
   expect(result.audit.missingDates).toHaveLength(10);
   expect(result.audit.inferredCells).toBe(0);
   expect(result.audit.coverage).toBe(1);
@@ -89,6 +91,8 @@ test('RC56 recovers a perforated partial interval without inventing missing date
   expect(result.audit.partial).toBeTruthy();
   expect(result.audit.expectedDays).toBe(31);
   expect(result.audit.exactDateDays).toBe(20);
+  expect(result.audit.partialStart).toBe('2026-07-12');
+  expect(result.audit.partialEnd).toBe('2026-07-31');
   expect(result.audit.coverage).toBeCloseTo(20/31,5);
   expect(result.audit.missingDates).toHaveLength(11);
   expect(result.audit.missingDates).toContain('2026-07-11');
