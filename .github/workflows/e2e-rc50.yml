@@ -27,8 +27,21 @@ jobs:
       - run: npm ci
       - run: npx playwright --version
       - run: npx playwright install --with-deps chromium
-      - name: Validar sintaxe do health check RC58
-        run: node --check rc50-integrity-check.js
+      - name: Validar sintaxe de todos os JavaScripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          found=0
+          for file in ./*.js; do
+            [ -e "$file" ] || continue
+            found=1
+            echo "Validando $file"
+            node --check "$file"
+          done
+          if [ "$found" -ne 1 ]; then
+            echo "Nenhum JavaScript encontrado na raiz."
+            exit 1
+          fi
       - run: npm run test:e2e:chromium
       - uses: actions/upload-artifact@v6
         if: always()
