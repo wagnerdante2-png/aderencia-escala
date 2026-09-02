@@ -1,4 +1,4 @@
-name: RC61 Adaptive End-to-End
+name: RC62 Adaptive End-to-End
 
 on:
   push:
@@ -21,12 +21,12 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e:chromium
 
-      - name: Build RC61 Windows test package
+      - name: Build RC62 Windows test package
         if: ${{ success() }}
         shell: bash
         run: |
           set -euo pipefail
-          ROOT="dist/ADERENCIA_ESCALA_RC61"
+          ROOT="dist/ADERENCIA_ESCALA_RC62"
           mkdir -p "$ROOT"
           cp \
             index.html styles.css dashboard.css \
@@ -44,19 +44,19 @@ jobs:
             navigation-integrity-rc44.js rc50-integrity-check.js \
             README.md LEIA-ME_LOCAL.txt RELEASE_MANIFEST.md \
             "$ROOT/"
-          printf 'RC61\nadaptive=RC61.1\nrc62_adapter=RC62.0\ncommit=%s\nworkflow_run=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$ROOT/BUILD_INFO.txt"
-          (cd dist && zip -r -9 ADERENCIA_ESCALA_RC61_TESTE_WINDOWS.zip ADERENCIA_ESCALA_RC61)
+          printf 'RC62\nadaptive=RC61.1\nrc62_adapter=RC62.0\ncommit=%s\nworkflow_run=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$ROOT/BUILD_INFO.txt"
+          (cd dist && zip -r -9 ADERENCIA_ESCALA_RC62_TESTE_WINDOWS.zip ADERENCIA_ESCALA_RC62)
 
       - uses: actions/upload-artifact@v4
         if: ${{ success() }}
         with:
-          name: aderencia-escala-rc61-windows
-          path: dist/ADERENCIA_ESCALA_RC61_TESTE_WINDOWS.zip
+          name: aderencia-escala-rc62-windows
+          path: dist/ADERENCIA_ESCALA_RC62_TESTE_WINDOWS.zip
           retention-days: 14
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report-rc61
+          name: playwright-report-rc62
           path: playwright-report/
           retention-days: 14
