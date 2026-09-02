@@ -14,7 +14,7 @@ test('RC57 mounts OCR fallback without eager Tesseract loading', async ({ page }
     legacyAlias: window.ADERENCIA_PDF_STORE_GUARD_RC56 === window.ADERENCIA_PDF_STORE_GUARD_RC57,
     tesseractScript: !!document.querySelector('script[src*="tesseract.min.js"]')
   }));
-  expect(state).toMatchObject({ version:'v1.0 RC57', parser:'RC57', guard:'RC57.1', ocr:'RC57.1', legacyAlias:true, tesseractScript:false });
+  expect(state).toMatchObject({ version:'v1.0 RC58', parser:'RC57', guard:'RC57.1', ocr:'RC57.1', legacyAlias:true, tesseractScript:false });
 });
 
 test('RC57 permits OCR retry only for structural text failure', async ({ page }) => {
