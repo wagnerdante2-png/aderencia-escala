@@ -1,37 +1,67 @@
-ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC59
+ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC61
 
-1. Extraia a pasta do pacote.
+1. Extraia integralmente a pasta do pacote.
 2. Abra index.html com duplo clique, preferencialmente no Microsoft Edge ou Google Chrome atualizado.
 3. Na primeira utilização, clique em "Criar base" e salve aderencia-dados.json, de preferência dentro da própria pasta da aplicação.
 4. Em outro computador, use "Vincular base" e selecione o mesmo aderencia-dados.json para recuperar histórico, divergências, configurações e cadastro de lojas/regionais.
 5. Selecione primeiro o PDF do espelho de ponto e aguarde o reconhecimento da loja e do período.
-6. Selecione a escala, preferencialmente em XLSX/XLSM/XLS. PDF de escala é aceito como contingência e passa por validações adicionais.
+6. Depois selecione a escala planejada em XLSX, XLSM, XLS ou PDF.
 7. Somente quando ponto e escala estiverem reconhecidos, clique em Calcular aderência.
 8. Antes de confiar em uma leitura incomum, confira o painel de qualidade e os diagnósticos disponíveis.
 9. Salve o resultado no histórico quando a análise estiver validada.
 
-COMPETÊNCIA: o mês pertence ao início do período integral do espelho. Exemplo: 11/06 a 10/07 = Junho; 11/07 a 10/08 = Julho.
+RC61 — FRONT-DOOR ADAPTATIVO DA ESCALA
 
-COBERTURA TEMPORAL: o cálculo final trabalha com datas comuns entre ponto e escala, mas a aceitação de uma escala parcial depende da fonte. Excel pode seguir pelo parser principal quando a estrutura é reconhecida com segurança. PDF de escala RC57 é mais rígido: precisa cobrir pelo menos 95% da competência do espelho e não fabrica dias ausentes.
+A RC61 é a camada principal de entrada da escala. O arquivo original é classificado e normalizado antes de chegar aos parsers históricos. A normalização gera uma grade canônica para o motor sem executar macros do XLSM.
 
-PDF DE ESCALA RC57: a loja do cabeçalho precisa ser a mesma do espelho. A leitura textual é usada primeiro. Se o texto for estruturalmente insuficiente, Tesseract.js pode ser carregado sob demanda para OCR. As coordenadas do OCR passam pelos mesmos gates de loja, período, cobertura e legenda de turnos; OCR não serve para contornar uma validação rejeitada.
+IDENTIDADE DA LOJA
 
-EXCEL RC58: ao selecionar uma nova escala Excel/XLSM/XLS, a escala anterior é invalidada imediatamente enquanto a nova leitura é processada. Evidência forte de outra loja no nome do arquivo ou no cabeçalho operacional bloqueia o fallback. Falhas apenas estruturais continuam podendo seguir para o parser principal.
+A loja reconhecida no espelho de ponto é a âncora da análise. Na RC61, o nome do arquivo ou um cabeçalho "MLxx" da escala não são, isoladamente, requisitos de aceite. A identidade da escala é conciliada principalmente pela população de colaboradores/matrículas contra o espelho já reconhecido. População sem correspondência mínima é bloqueada para evitar processar uma escala de origem incompatível.
 
-Ao selecionar um novo PDF de escala, a escala anterior também é invalidada antes da nova leitura. Se o novo arquivo for bloqueado, o botão de cálculo permanece desabilitado em vez de reutilizar silenciosamente o arquivo anterior.
+POPULAÇÃO
 
-O seletor Mês/Ano do painel superior é a competência global. Ao alterá-lo, Histórico, Monitoramento, Divergências, Evolução, Semestral pelo ano e exportações relacionadas acompanham a mesma referência temporal.
+Diferenças legítimas de população entre ponto e escala podem existir por admissões, desligamentos e alterações ocorridas no período. A RC61 trabalha com a população conciliada; não exige que os dois arquivos tenham exatamente a mesma quantidade de pessoas. Colaboradores que não puderem ser conciliados não são inventados nem relabelados.
 
-O histórico continua existindo também no navegador como cache/contingência. Quando uma base portátil está vinculada e autorizada, alterações persistentes são gravadas automaticamente no JSON.
+PERÍODO E PROPORCIONALIDADE
+
+A competência continua sendo o mês/ano do início do período integral do espelho. Exemplo: 11/06 a 10/07 = Junho; 11/07 a 10/08 = Julho.
+
+A grade canônica usa as datas reais comuns entre espelho e escala. Assim, uma escala mensal 01→30/31 pode ser comparada proporcionalmente com um espelho 11→10, inclusive atravessando meses. A RC61 não exige artificialmente 95% de cobertura para que um PDF seja aceito; ela exige evidência estrutural suficiente, datas utilizáveis, população conciliada e turnos resolvidos no período efetivamente disponível.
+
+TURNOS E VERSÕES DA ESCALA
+
+Códigos como T1, T6 etc. não têm significado fixo entre versões. A RC61 lê a legenda da própria versão/arquivo e associa o código ao horário encontrado nela. O mesmo código pode, portanto, representar horários diferentes em modelos diferentes sem reutilizar silenciosamente a legenda de outro modelo.
+
+EXCEÇÕES DIÁRIAS
+
+Quando o espelho contém uma previsão/alteração específica para uma data, a exceção vale para aquela data. Ela não é propagada automaticamente para os dias seguintes. Na ausência de exceção exata, aplica-se a previsão válida correspondente.
+
+PDF E OCR
+
+A leitura textual do PDF é tentada primeiro. Se a estrutura textual for insuficiente, Tesseract.js pode ser carregado sob demanda para OCR. PDF digitalizado e PDF textual passam pela mesma política RC61: calendário reconhecível, população conciliável e legenda dos turnos utilizados. OCR não serve para fabricar população, datas ou horários inexistentes.
+
+SEGURANÇA DE ESTADO
+
+Ao iniciar a leitura de uma nova escala, o cálculo anterior não deve ser reutilizado silenciosamente. Se a nova entrada não puder ser normalizada com segurança, o botão de cálculo permanece desabilitado até que uma escala válida seja reconhecida.
+
+COMPETÊNCIA GLOBAL E HISTÓRICO
+
+O seletor Mês/Ano do painel superior é a competência global. Histórico, Monitoramento, Divergências, Evolução, Semestral pelo ano e exportações relacionadas acompanham essa referência temporal. Ao salvar uma análise, a competência apurada pelo espelho prevalece.
+
+BASE PORTÁTIL
+
+O histórico continua existindo no navegador como cache/contingência. Quando uma base portátil está vinculada e autorizada, alterações persistentes são gravadas automaticamente no JSON.
 
 O menu Lojas permite cadastrar novas unidades e atribuir uma regional sem alterar o programa. ML61 Vinhedo pertence a Guardiões da Chama.
 
 O menu Administrador permite habilitar ou ocultar o botão "Limpar histórico". Não há senha. Quando o histórico é apagado, as divergências relacionadas também são zeradas e a base portátil vinculada recebe a alteração.
 
+DEPENDÊNCIAS E PRIVACIDADE
+
+PDF.js, SheetJS/XLSX e jsPDF são obtidos por CDN no startup. Tesseract.js 5.x não é carregado na abertura normal; é carregado somente quando uma contingência OCR é necessária. Os arquivos analisados permanecem no navegador e não são enviados para um backend próprio desta aplicação.
+
 Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
 
-DEPENDÊNCIAS: PDF.js, SheetJS/XLSX e jsPDF são obtidos por CDN no startup. Tesseract.js 5.x NÃO é carregado na abertura normal; ele é carregado somente se uma contingência OCR for realmente necessária. Os arquivos analisados permanecem no navegador e não são enviados para um backend próprio desta aplicação.
+SAÚDE DO RUNTIME
 
-SAÚDE DO RUNTIME: por compatibilidade histórica, o health check consolidado continua em ADERENCIA_RC50_HEALTH. Na RC59 validada, ADERENCIA_RC50_HEALTH.ok deve ser true.
-
-NOVO MODELO 1.2 / RC59: quando o XLSM salva fórmulas de escala sem o resultado calculado, a aplicação não escolhe mais uma aba vazia apenas por conter muitas datas. Ela reconcilia colaboradores por matrícula, preserva códigos materializados e regras de folga/eventos do XLSM e pode recuperar o horário previsto no quadro Horários do próprio espelho. A interface identifica esse modo híbrido explicitamente.
+Por compatibilidade histórica, o health check consolidado continua em ADERENCIA_RC50_HEALTH. Na RC61 validada, window.ADERENCIA_VERSION deve ser "v1.0 RC61", window.ADERENCIA_SCHEDULE_ADAPTIVE_RC61 deve estar ativo e ADERENCIA_RC50_HEALTH.ok deve ser true.

@@ -1,6 +1,12 @@
-# Manifesto de Release — v1.0 RC58
+# Manifesto de Release — v1.0 RC61
 
-Este manifesto registra o runtime ativo, os gates de segurança e os critérios de aceite da candidata operacional RC58 para uso local.
+Este manifesto registra o runtime ativo, a política adaptativa de leitura de escala, os controles de segurança e os critérios de aceite da candidata operacional RC61 para uso local.
+
+## Objetivo da RC61
+
+A RC61 substitui o conjunto de pré-condições rígidas do arquivo original por um **front-door adaptativo**. A escala é classificada, conciliada com o espelho de ponto e convertida em uma grade canônica antes de chegar às camadas históricas do motor.
+
+O objetivo é aceitar variações operacionais reais sem transformar tolerância em aceitação cega.
 
 ## Runtime essencial
 
@@ -20,26 +26,21 @@ Arquivos base:
 
 `window.ADERENCIA_ACTIVE_MODULES` é a fonte de verdade para os módulos carregados pelo bootstrap.
 
-## Módulos relevantes da RC58
+## Front-door adaptativo
 
-A RC58 mantém o parser PDF e o OCR rígido introduzidos na RC57 e acrescenta hardening transacional/identidade para Excel.
+O módulo principal da rodada é:
 
-- `schedule-hardening-rc51.js`
-- `schedule-monthly-bridge-rc53.js`
-- `schedule-provenance-guard-rc55.js`
-- `schedule-source-identity-guard-rc58.js`
-- `schedule-preprocess-rc52.js` — runtime RC52.3 na RC58
-- `pdf-store-header-guard-rc57.js`
-- `pdf-schedule-parser-rc57.js`
-- `ocr-lazy-rc48.js`
-- `pdf-security-rc35.js`
-- `rc50-integrity-check.js` — nome histórico preservado por compatibilidade
+- `schedule-adaptive-rc61.js` — runtime `RC61.1`
 
-Os parsers antigos podem permanecer no repositório para histórico, mas não fazem parte da lista ativa quando não aparecem em `ADERENCIA_ACTIVE_MODULES`.
+Ele entra antes dos gates históricos e recebe o arquivo original de escala em XLSX, XLSM, XLS ou PDF.
+
+A saída normalizada é um workbook canônico com nome `RC51_RC61_<LOJA>_...xlsx`. Esse prefixo identifica uma grade interna já reconciliada e impede que ela seja reinterpretada como um arquivo original cru.
+
+Os módulos históricos permanecem ativos para compatibilidade e defesa em profundidade, incluindo `schedule-hardening-rc51.js`, `schedule-monthly-bridge-rc53.js`, `schedule-provenance-guard-rc55.js`, `schedule-source-identity-guard-rc58.js`, `schedule-preprocess-rc52.js`, `pdf-store-header-guard-rc57.js` e `pdf-schedule-parser-rc57.js`.
 
 ## Regra canônica de competência
 
-A competência é sempre o mês/ano do **início do período integral do espelho de ponto**.
+A competência é o mês/ano do **início do período integral do espelho de ponto**.
 
 - `11/06/2026 a 10/07/2026` = Junho/2026
 - `11/07/2026 a 10/08/2026` = Julho/2026
@@ -47,68 +48,91 @@ A competência é sempre o mês/ano do **início do período integral do espelho
 
 Essa referência é usada no salvamento do Histórico e propagada para as visualizações do ecossistema.
 
-## Política de cobertura por fonte
+## Política temporal RC61
 
-O motor final calcula somente sobre datas presentes simultaneamente no ponto e na escala, mas as camadas de entrada possuem critérios diferentes.
+A grade canônica usa a **interseção de datas reais** entre a escala reconhecida e o período do espelho.
 
-### Excel/XLSM/XLS
+Consequências:
 
-- RC52.3 tenta pré-normalizar a escala usando o contexto validado do espelho;
-- RC51/RC53 tratam grades alternativas e mensais quando existe evidência suficiente;
-- falhas meramente estruturais podem retornar ao parser principal para preservar compatibilidade;
-- conflito forte de identidade da loja não recebe fallback;
-- ao iniciar uma nova leitura Excel, a escala anterior é invalidada imediatamente para impedir reaproveitamento silencioso durante processamento assíncrono;
-- se o parser principal reconhecer a estrutura com segurança, o cálculo final pode operar sobre a interseção disponível.
+- uma escala 01→30/31 pode ser comparada proporcionalmente com um espelho 11→10;
+- a interseção pode atravessar mudança de mês/ano;
+- datas que não existem na escala não são inventadas;
+- a RC61 não exige um threshold fixo de 95% para PDF;
+- o aceite exige estrutura mínima reconhecível, população conciliável e legenda suficiente para os turnos efetivamente utilizados.
 
-### PDF de escala RC57 dentro da RC58
+## Política de população e identidade
 
-- cabeçalho precisa confirmar a loja do espelho;
-- leitura textual é primária;
-- OCR é contingencial e carregado sob demanda;
-- a grade PDF precisa cobrir pelo menos **95% da competência do espelho**;
-- dias ausentes não são inferidos;
-- todos os turnos utilizados precisam ter horário na legenda;
-- OCR não pode contornar loja divergente, cobertura insuficiente ou legenda incompleta.
+A loja do espelho é a âncora da análise. A RC61 não exige que o nome do arquivo ou o cabeçalho da escala tragam a mesma identificação literal da loja.
 
-## Identidade de loja e proveniência
+A origem é validada principalmente pela conciliação entre a população da escala e a população do espelho:
 
-A RC55 impede relabeling de arquivos sintéticos. Um arquivo `PDF_GRID_RC57_ML10.xlsx`, por exemplo, não pode ser normalizado como ML11.
+1. matrícula é usada quando disponível;
+2. nome normalizado é usado como evidência direta;
+3. aproximação de nomes é usada somente dentro de limites conservadores;
+4. cada colaborador do ponto só pode ser consumido uma vez na conciliação;
+5. diferenças de quantidade por admissões/desligamentos são toleradas;
+6. população sem sobreposição mínima é bloqueada como origem incompatível.
 
-A RC57 protege o PDF original por cabeçalho validado. A RC58 estende a proteção ao Excel original:
+A RC61 nunca cria colaboradores inexistentes para melhorar artificialmente a cobertura.
 
-1. considera evidência forte de loja no nome do arquivo quando ela é explícita (`MLxx`/`LOJA xx`);
-2. inspeciona evidência operacional do workbook;
-3. compara essa evidência com a loja já validada do espelho;
-4. em divergência forte, bloqueia o arquivo e não o envia ao parser principal como fallback;
-5. resíduos fracos de template continuam tratados pelos normalizadores existentes, evitando falsos bloqueios.
+## Turnos por versão
 
-## OCR
+Códigos de turno não possuem semântica global fixa.
 
-`ocr-lazy-rc48.js` mantém Tesseract.js fora do startup. O parser RC57 chama `ADERENCIA_ENSURE_OCR()` somente quando há insuficiência estrutural compatível com OCR.
+A RC61 lê a legenda do próprio arquivo/modelo. Assim, `T6` em uma versão pode representar `13:00–22:00` e em outra `10:00–19:00` sem conflito.
 
-As coordenadas OCR passam novamente pelos mesmos gates rígidos de loja, competência, cobertura e turnos. O projeto permanece preso ao Tesseract.js **5.x**; mudança de major version exige nova validação.
+Se um turno utilizado na grade não tiver horário resolvido na legenda daquela origem, a normalização é bloqueada.
 
-## Invalidação de estado
+## Exceções diárias
 
-Na RC58, tanto PDF quanto Excel invalidam a escala anterior antes de validar uma nova entrada.
+Previsões específicas encontradas no espelho são aplicadas à data correspondente. Uma exceção exata não é propagada automaticamente para os dias seguintes.
 
-Se o novo arquivo falhar:
+Quando uma célula Excel está vazia e existe previsão segura para colaborador/data no espelho, a RC61 pode materializar um código interno de turno para preservar o horário previsto na grade canônica.
 
-- não há reaproveitamento silencioso da escala anterior;
-- o resultado anterior fica oculto/inválido;
-- o botão Calcular permanece desabilitado até uma nova escala válida ser reconhecida.
+## Excel/XLSM/XLS
+
+A RC61:
+
+- não executa macros;
+- procura grades contendo Nome, Cargo, datas e códigos diários;
+- reconcilia colaboradores com o espelho;
+- detecta a versão/modelo quando há evidência textual;
+- extrai a legenda do próprio workbook;
+- escolhe candidatos pela combinação de população conciliada, período e materialidade;
+- tolera resíduos de template que não representam a população real da escala;
+- falha fechada quando não consegue formar uma grade utilizável.
+
+## PDF textual e PDF digitalizado
+
+A leitura textual é tentada primeiro. Quando ela é insuficiente, `ADERENCIA_ENSURE_OCR()` carrega Tesseract.js sob demanda.
+
+O parser RC61 exige:
+
+- calendário/dias reconhecíveis;
+- população/cargos reconhecíveis;
+- conciliação mínima com o espelho;
+- códigos de escala materializados;
+- horários para os turnos utilizados.
+
+Cabeçalho literal de loja não é obrigatório quando a população prova a origem. OCR não pode inventar população, datas ou turnos ausentes.
+
+## Segurança e proveniência
+
+- PDF.js usa `isEvalSupported=false` e scripting desabilitado;
+- Tesseract não é carregado no startup;
+- grade sintética RC61 possui identificação própria;
+- o estado calculável anterior é invalidado enquanto uma nova escala é processada;
+- uma entrada não reconhecida deixa o cálculo desabilitado;
+- módulos de proveniência RC55 permanecem ativos para impedir relabeling de artefatos internos;
+- parsers históricos não devem reassumir o arquivo original quando o front-door RC61 está processando a entrada.
 
 ## Persistência e dashboards
 
 - `localStorage` funciona como cache/contingência local;
-- a base portátil `aderencia-dados.json` pode ser criada/vinculada em navegador compatível;
+- a base portátil `aderencia-dados.json` pode ser criada/vinculada;
 - histórico, divergências, configuração administrativa e cadastro de lojas/regionais acompanham a base portátil;
 - a competência global sincroniza LED da rede, Histórico, Monitoramento, Divergências, Evolução e ano do Semestral;
 - reprocessar a mesma loja/competência substitui o registro correspondente em vez de duplicá-lo.
-
-## Segurança de PDF
-
-`pdf-security-rc35.js` e as chamadas do parser mantêm `isEvalSupported=false` e scripting desabilitado no PDF.js.
 
 ## Dependências externas
 
@@ -128,37 +152,36 @@ Sob demanda:
 
 Por compatibilidade histórica, o objeto consolidado continua se chamando `ADERENCIA_RC50_HEALTH`.
 
-Na RC58 certificada:
+Na RC61 certificada:
 
-`ADERENCIA_VERSION === 'v1.0 RC58'`
+`ADERENCIA_VERSION === 'v1.0 RC61'`
+
+`ADERENCIA_SCHEDULE_ADAPTIVE_RC61.version` começa com `RC61`
 
 `ADERENCIA_RC50_HEALTH.ok === true`
 
-O health check valida, entre outros itens, lista ativa sem duplicações, cache, OCR não eager, segurança PDF, hardening RC51, bridge RC53, proveniência RC55, identidade Excel RC58, preprocess RC52.3, gate de cabeçalho RC57, parser RC57, fallback OCR RC57, histórico, competência, navegação, recorrência e cadastro de lojas.
-
-## Testes de aceite RC58
+## Testes de aceite RC61
 
 1. Abrir `index.html` sem erro global não tratado.
-2. Confirmar `ADERENCIA_VERSION === 'v1.0 RC58'`.
-3. Confirmar `ADERENCIA_RC50_HEALTH.ok === true`.
-4. Confirmar que Tesseract não é carregado no startup.
-5. Confirmar que PDF com loja divergente/ambígua permanece bloqueado.
-6. Confirmar que OCR só é elegível para insuficiência estrutural e não para cobertura, turnos ou loja divergente.
-7. Confirmar que novo PDF invalida imediatamente a escala anterior.
-8. Confirmar que novo Excel também invalida imediatamente a escala anterior durante pré-processamento.
-9. Confirmar que evidência forte de Excel pertencente a outra loja bloqueia o fallback.
-10. Confirmar que resíduos fracos de template não causam bloqueio falso quando a loja correta é confirmada por evidência mais forte.
-11. Confirmar que falha estrutural recuperável de Excel ainda pode seguir ao parser principal.
-12. Confirmar competência canônica 11→10 em Histórico e dashboards.
-13. Confirmar lote, exportações e base portátil.
+2. Confirmar versão global `v1.0 RC61` e health check verde.
+3. Confirmar que Tesseract não é carregado no startup.
+4. Confirmar que escala 01→30 pode gerar somente a interseção 11→30 contra espelho 11→10 do mês seguinte.
+5. Confirmar calendário 11→10 atravessando mês corretamente.
+6. Confirmar que população 55×60 pode ser aceita quando 55 pessoas são conciliadas.
+7. Confirmar que uma população sem correspondência é rejeitada.
+8. Confirmar que o mesmo código de turno pode ter horários diferentes em versões diferentes.
+9. Confirmar que exceção diária vale somente para a data exata.
+10. Confirmar PDF sem cabeçalho literal de loja quando a população comprova a origem.
+11. Confirmar que arquivo estruturalmente inválido falha fechado, sem fallback inseguro.
+12. Confirmar que o front-door RC61 possui o evento do arquivo original antes do fallback transacional RC58.
+13. Preservar regressões históricas de navegação, competência, histórico, divergências, recorrência, regional, persistência, lote e exportações.
 14. Toda a suíte Playwright precisa concluir com sucesso.
+15. O pacote Windows só pode ser construído e publicado depois dos testes E2E verdes.
 
-## Certificação atual
+## Certificação e pacote
 
-A RC58 funcional está no commit `6355fe6885f1cb8cb35d37186e4f88bddf7247ef`.
-
-A execução GitHub Actions **#189**, run id `33652638184`, concluiu o job E2E integralmente com `success` em 2 de setembro de 2026.
+A identificação exata do commit e da execução do workflow que geraram cada pacote fica registrada em `BUILD_INFO.txt` dentro do ZIP. O artefato final deve ser validado por integridade ZIP antes de distribuição.
 
 ## Congelamento da rodada
 
-A RC58 é a candidata corrente para novo teste prático. Correções decorrentes do teste manual devem abrir uma nova rodada identificável, preservando este marco certificado no histórico.
+A RC61 é a candidata corrente para teste prático. Novas correções funcionais posteriores devem abrir uma rodada identificável, preservando este marco no histórico de commits e Actions.
