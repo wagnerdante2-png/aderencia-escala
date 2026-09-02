@@ -1,4 +1,4 @@
-name: RC50 End-to-End
+name: RC58 End-to-End
 
 on:
   push:
@@ -23,6 +23,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report-rc50
+          name: playwright-report-rc58
           path: playwright-report/
           retention-days: 14

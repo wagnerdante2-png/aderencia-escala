@@ -1,4 +1,4 @@
-ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC57
+ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC58
 
 1. Extraia a pasta do pacote.
 2. Abra index.html com duplo clique, preferencialmente no Microsoft Edge ou Google Chrome atualizado.
@@ -16,7 +16,9 @@ COBERTURA TEMPORAL: o cálculo final trabalha com datas comuns entre ponto e esc
 
 PDF DE ESCALA RC57: a loja do cabeçalho precisa ser a mesma do espelho. A leitura textual é usada primeiro. Se o texto for estruturalmente insuficiente, Tesseract.js pode ser carregado sob demanda para OCR. As coordenadas do OCR passam pelos mesmos gates de loja, período, cobertura e legenda de turnos; OCR não serve para contornar uma validação rejeitada.
 
-Ao selecionar um novo PDF de escala, a escala anterior é invalidada antes da nova leitura. Se o novo arquivo for bloqueado, o botão de cálculo permanece desabilitado em vez de reutilizar silenciosamente o arquivo anterior.
+EXCEL RC58: ao selecionar uma nova escala Excel/XLSM/XLS, a escala anterior é invalidada imediatamente enquanto a nova leitura é processada. Evidência forte de outra loja no nome do arquivo ou no cabeçalho operacional bloqueia o fallback. Falhas apenas estruturais continuam podendo seguir para o parser principal.
+
+Ao selecionar um novo PDF de escala, a escala anterior também é invalidada antes da nova leitura. Se o novo arquivo for bloqueado, o botão de cálculo permanece desabilitado em vez de reutilizar silenciosamente o arquivo anterior.
 
 O seletor Mês/Ano do painel superior é a competência global. Ao alterá-lo, Histórico, Monitoramento, Divergências, Evolução, Semestral pelo ano e exportações relacionadas acompanham a mesma referência temporal.
 
@@ -30,4 +32,4 @@ Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
 
 DEPENDÊNCIAS: PDF.js, SheetJS/XLSX e jsPDF são obtidos por CDN no startup. Tesseract.js 5.x NÃO é carregado na abertura normal; ele é carregado somente se uma contingência OCR for realmente necessária. Os arquivos analisados permanecem no navegador e não são enviados para um backend próprio desta aplicação.
 
-SAÚDE DO RUNTIME: por compatibilidade histórica, o health check consolidado continua em ADERENCIA_RC50_HEALTH. Na RC57 validada, ADERENCIA_RC50_HEALTH.ok deve ser true.
+SAÚDE DO RUNTIME: por compatibilidade histórica, o health check consolidado continua em ADERENCIA_RC50_HEALTH. Na RC58 validada, ADERENCIA_RC50_HEALTH.ok deve ser true.
