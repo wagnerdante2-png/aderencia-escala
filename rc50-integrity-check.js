@@ -2,7 +2,7 @@
 'use strict';
 function run(){
  const checks=[];const add=(name,ok,detail='')=>checks.push({name,ok:!!ok,detail});
- add('version',/^v1\.0 RC(?:5[1-9]|6[01])$/.test(window.ADERENCIA_VERSION||''),window.ADERENCIA_VERSION||'ausente');
+ add('version',/^v1\.0 RC(?:5[1-9]|6[0-2])$/.test(window.ADERENCIA_VERSION||''),window.ADERENCIA_VERSION||'ausente');
  const active=window.ADERENCIA_ACTIVE_MODULES||[];
  add('active-modules',Array.isArray(active)&&active.length>10,`${active.length} módulos`);
  add('no-duplicate-modules',new Set(active).size===active.length);
