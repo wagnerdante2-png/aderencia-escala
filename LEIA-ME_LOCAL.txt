@@ -1,4 +1,4 @@
-ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC58
+ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC59
 
 1. Extraia a pasta do pacote.
 2. Abra index.html com duplo clique, preferencialmente no Microsoft Edge ou Google Chrome atualizado.
@@ -32,4 +32,6 @@ Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
 
 DEPENDÊNCIAS: PDF.js, SheetJS/XLSX e jsPDF são obtidos por CDN no startup. Tesseract.js 5.x NÃO é carregado na abertura normal; ele é carregado somente se uma contingência OCR for realmente necessária. Os arquivos analisados permanecem no navegador e não são enviados para um backend próprio desta aplicação.
 
-SAÚDE DO RUNTIME: por compatibilidade histórica, o health check consolidado continua em ADERENCIA_RC50_HEALTH. Na RC58 validada, ADERENCIA_RC50_HEALTH.ok deve ser true.
+SAÚDE DO RUNTIME: por compatibilidade histórica, o health check consolidado continua em ADERENCIA_RC50_HEALTH. Na RC59 validada, ADERENCIA_RC50_HEALTH.ok deve ser true.
+
+NOVO MODELO 1.2 / RC59: quando o XLSM salva fórmulas de escala sem o resultado calculado, a aplicação não escolhe mais uma aba vazia apenas por conter muitas datas. Ela reconcilia colaboradores por matrícula, preserva códigos materializados e regras de folga/eventos do XLSM e pode recuperar o horário previsto no quadro Horários do próprio espelho. A interface identifica esse modo híbrido explicitamente.

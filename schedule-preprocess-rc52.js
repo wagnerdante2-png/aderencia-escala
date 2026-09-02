@@ -18,7 +18,7 @@ function invalidate(file){
 }
 function blocked(file,ctx,error){
  const detail=String(error?.message||error||'identidade da escala não confirmada');
- if(status){status.textContent=detail;status.className='status error'}
+ if(status){status.textContent=`RC59: ${detail}`;status.className='status error'}
  if(nameEl&&file)nameEl.textContent=file.name;
  if(calc)calc.disabled=true;if(result)result.classList.add('hidden');
  window.ADERENCIA_SCHEDULE_PREPROCESS.last={mode:'blocked',source:file?.name||null,store:ctx?.store||null,start:ctx?.start||null,end:ctx?.end||null,error:detail,errorCode:error?.code||null,fatal:true,at:new Date().toISOString()};
@@ -31,12 +31,12 @@ window.addEventListener('change',ev=>{
  if(!x){window.ADERENCIA_SCHEDULE_PREPROCESS.last={mode:'bypass',reason:'no-validated-point-context',source:file.name,at:new Date().toISOString()};return}
  ev.preventDefault();ev.stopImmediatePropagation();busy=true;
  const {h,c:ctx}=x;invalidate(file);
- if(status){status.textContent='RC58: validando transação, identidade e estrutura da escala...';status.className='status error'}
+ if(status){status.textContent='RC59: validando transação, identidade e estrutura da escala...';status.className='status error'}
  Promise.resolve(h.normalizeExcel(file,ctx)).then(normalized=>{
    window.ADERENCIA_SCHEDULE_PREPROCESS.last={mode:'normalized',source:file.name,target:normalized.name,store:ctx.store,start:ctx.start,end:ctx.end,at:new Date().toISOString()};
    pass(normalized);
  }).catch(error=>{
-   if(error?.aderenciaFatal){console.warn('RC58: fallback bloqueado por identidade forte da escala.',error);blocked(file,ctx,error);return}
+   if(error?.aderenciaFatal){console.warn('RC59: fallback bloqueado por gate fatal da escala.',error);blocked(file,ctx,error);return}
    console.warn('RC52: pré-normalização não aplicada; usando parser principal.',error);
    window.ADERENCIA_SCHEDULE_PREPROCESS.last={mode:'core-fallback',source:file.name,store:ctx.store,start:ctx.start,end:ctx.end,error:String(error?.message||error),fatal:false,at:new Date().toISOString()};
    pass(file);
