@@ -36,7 +36,7 @@ test('startup has no uncaught errors and RC50 integrity is green', async ({ page
   expect(health.pdfOcr).toBe('RC57.1');
   expect(health.sourceGuard).toBe('RC58.1');
   expect(health.transactionGuard).toBe('RC58.1');
-  expect(health.realXlsm).toBe('RC59.1');
+  expect(health.realXlsm).toBe('RC59.2');
   expect(health.core?.ok).toBeTruthy();
   expect(health.final?.ok, JSON.stringify(health.failed)).toBeTruthy();
   expect(health.pdf).toMatchObject({ active:true, isEvalSupported:false, enableScripting:false });

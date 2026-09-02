@@ -11,6 +11,14 @@ test('RC59 registration key uses the employee number and ignores company prefix'
   expect(value).toBe('62');
 });
 
+test('RC59.2 uses the planned columns from the Horários table, not the shift description', async ({ page }) => {
+  await openApp(page);
+  const value=await page.evaluate(()=>window.ADERENCIA_REAL_XLSM_RC59.plannedTimes(
+    '21/06/2026 614 - ML32 07:00-12:00-13:00-16:00 (QUARTA-FEIRA) 11:00 13:00 14:00 20:00'
+  ));
+  expect(value).toEqual({start:'11:00',end:'20:00',times:['11:00','13:00','14:00','20:00']});
+});
+
 test('RC59 reconstructs Novo Modelo from materialized rules plus point schedule metadata', async ({ page }) => {
   await openApp(page);
   const result=await page.evaluate(async()=>{
