@@ -1,20 +1,24 @@
-ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC40
+ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC57
 
 1. Extraia a pasta do pacote.
 2. Abra index.html com duplo clique, preferencialmente no Microsoft Edge ou Google Chrome atualizado.
-3. Na primeira utilização, clique em "Criar base" e salve o arquivo aderencia-dados.json, de preferência dentro da própria pasta da aplicação.
+3. Na primeira utilização, clique em "Criar base" e salve aderencia-dados.json, de preferência dentro da própria pasta da aplicação.
 4. Em outro computador, use "Vincular base" e selecione o mesmo aderencia-dados.json para recuperar histórico, divergências, configurações e cadastro de lojas/regionais.
-5. Selecione o PDF do espelho de ponto.
+5. Selecione primeiro o PDF do espelho de ponto e aguarde o reconhecimento da loja e do período.
 6. Selecione a escala, preferencialmente em XLSX/XLSM/XLS. PDF de escala é aceito como contingência e passa por validações adicionais.
-7. Clique em Calcular aderência.
-8. Antes de confiar em uma leitura incomum, use "Diagnóstico da leitura" para conferir a matriz Funcionário × Data × Código interpretada pela engine.
-9. Salve o resultado no histórico quando estiver validado.
+7. Somente quando ponto e escala estiverem reconhecidos, clique em Calcular aderência.
+8. Antes de confiar em uma leitura incomum, confira o painel de qualidade e os diagnósticos disponíveis.
+9. Salve o resultado no histórico quando a análise estiver validada.
 
-COMPETÊNCIA: o mês pertence ao início do período integral do espelho. Exemplo: 11/06 a 10/07 = Junho; 11/07 a 10/08 = Julho. Se a escala cobrir apenas parte do ciclo, o cálculo usa proporcionalmente os dias de interseção disponíveis.
+COMPETÊNCIA: o mês pertence ao início do período integral do espelho. Exemplo: 11/06 a 10/07 = Junho; 11/07 a 10/08 = Julho.
+
+COBERTURA TEMPORAL: o cálculo final trabalha com datas comuns entre ponto e escala, mas a aceitação de uma escala parcial depende da fonte. Excel pode seguir pelo parser principal quando a estrutura é reconhecida com segurança. PDF de escala RC57 é mais rígido: precisa cobrir pelo menos 95% da competência do espelho e não fabrica dias ausentes.
+
+PDF DE ESCALA RC57: a loja do cabeçalho precisa ser a mesma do espelho. A leitura textual é usada primeiro. Se o texto for estruturalmente insuficiente, Tesseract.js pode ser carregado sob demanda para OCR. As coordenadas do OCR passam pelos mesmos gates de loja, período, cobertura e legenda de turnos; OCR não serve para contornar uma validação rejeitada.
+
+Ao selecionar um novo PDF de escala, a escala anterior é invalidada antes da nova leitura. Se o novo arquivo for bloqueado, o botão de cálculo permanece desabilitado em vez de reutilizar silenciosamente o arquivo anterior.
 
 O seletor Mês/Ano do painel superior é a competência global. Ao alterá-lo, Histórico, Monitoramento, Divergências, Evolução, Semestral pelo ano e exportações relacionadas acompanham a mesma referência temporal.
-
-A aba Evolução apresenta barras mensais da seleção atual e linha da média da rede, com filtros por regional e loja.
 
 O histórico continua existindo também no navegador como cache/contingência. Quando uma base portátil está vinculada e autorizada, alterações persistentes são gravadas automaticamente no JSON.
 
@@ -24,4 +28,6 @@ O menu Administrador permite habilitar ou ocultar o botão "Limpar histórico". 
 
 Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
 
-IMPORTANTE: PDF.js, SheetJS, jsPDF e Tesseract.js são carregados pela internet quando a página abre. Os arquivos analisados permanecem no navegador e não são enviados para um servidor por esta aplicação.
+DEPENDÊNCIAS: PDF.js, SheetJS/XLSX e jsPDF são obtidos por CDN no startup. Tesseract.js 5.x NÃO é carregado na abertura normal; ele é carregado somente se uma contingência OCR for realmente necessária. Os arquivos analisados permanecem no navegador e não são enviados para um backend próprio desta aplicação.
+
+SAÚDE DO RUNTIME: por compatibilidade histórica, o health check consolidado continua em ADERENCIA_RC50_HEALTH. Na RC57 validada, ADERENCIA_RC50_HEALTH.ok deve ser true.

@@ -1,75 +1,75 @@
-# Especificação do parser de escalas PDF - RC13
+# Especificação operacional do parser de escalas PDF — RC57
 
 ## Objetivo
 
-Transformar uma escala PDF em uma matriz determinística `Loja × Colaborador × Cargo × Data × Código`, com a mesma estrutura lógica usada pelo parser Excel. O PDF nunca deve gerar um percentual de aderência se a matriz não puder ser reconstruída com evidências suficientes.
+Transformar uma escala PDF em uma matriz determinística `Loja × Colaborador × Cargo × Data × Código` antes que qualquer percentual de aderência seja liberado.
 
-## Mapeamento do PDF de referência
+A RC57 é deliberadamente **fail-closed**: se loja, grade, período, cobertura ou legenda de turnos não puderem ser demonstrados com evidência suficiente, o PDF é bloqueado.
 
-Arquivo analisado: `Escala de Folgas - 33 - 06-07-2026(2).pdf`.
+## Âncora obrigatória: espelho de ponto
 
-Características observadas na página:
+O parser PDF não trabalha isoladamente. Antes de ler a escala, precisa existir um contexto validado do espelho contendo:
 
-- Página única em aproximadamente 841,68 × 595,20 pontos.
-- Cabeçalho operacional identifica `LOJA 33`, `Julho`, `2026` e `ML33 - CAMPINAS AMOREIRAS`.
-- A linha de datas possui 31 colunas: `11, 12, ... 31, 1, 2, ... 10`.
-- A linha imediatamente associada contém os dias da semana: `sáb, dom, seg, ...`.
-- No arquivo de referência, os centros das 31 colunas são aproximadamente 258,9 a 730,6 pontos, com passo regular próximo de 15,72 pontos.
-- A coluna Nome ocupa a área à esquerda; Cargo fica entre Nome e a primeira coluna de data.
-- Foram identificadas 39 linhas de colaboradores e todas possuem 31 códigos de escala.
-- A legenda de turnos fica à direita da grade, iniciando aproximadamente após x=754. Isso é crítico: `T1`, `T2`, etc. da legenda podem estar na mesma altura Y das linhas dos colaboradores e jamais podem ser confundidos com células da escala.
+- loja;
+- início da competência;
+- fim da competência.
 
-## Regra estrutural
+A loja e o período do espelho são as âncoras contra as quais a escala é validada.
 
-O parser trabalha primeiro por geometria da página e somente depois por texto corrido.
+## 1. Identidade de loja no cabeçalho
 
-### 1. Loja
+O módulo `pdf-store-header-guard-rc57.js` inspeciona primeiro o topo da primeira página.
 
 Prioridade:
 
-1. cabeçalho `MLxx`;
-2. cabeçalho `LOJA xx`;
-3. nunca usar uma ocorrência de `MLxx` dentro da legenda ou de textos secundários como identificação da loja.
+1. `MLxx`;
+2. `LOJA xx` quando não existe `MLxx` no cabeçalho.
 
-### 2. Grade de dias
+Regras:
 
-- Localizar grupos horizontais de números inteiros de 1 a 31.
-- Exigir sequência cronológica coerente, permitindo a virada `31 -> 1`.
-- Medir regularidade do espaçamento entre as colunas.
-- Guardar os centros X das colunas; eles passam a ser a referência geométrica para todas as células.
+- dois códigos `MLxx` diferentes no cabeçalho tornam o PDF ambíguo e bloqueado;
+- a loja encontrada precisa ser exatamente a mesma loja já reconhecida no espelho;
+- nome do arquivo não substitui a identidade do cabeçalho;
+- ocorrências secundárias fora do cabeçalho não são a âncora de identidade.
 
-### 3. Datas reais
+Se a camada textual do cabeçalho não trouxer loja suficiente, o guard pode carregar OCR sob demanda e reconhecer apenas a região superior da primeira página. Mesmo nesse caso a loja precisa coincidir com a do espelho.
 
-Nunca assumir que o mês do cabeçalho significa automaticamente mês inicial ou mês de fechamento.
+## 2. Extração textual primária
 
-Para cada PDF são avaliadas três hipóteses:
+Depois do gate de loja, `pdf-schedule-parser-rc57.js` tenta a camada textual do PDF.
 
-1. `header-literal`: o primeiro segmento pertence ao mês/ano mostrado no cabeçalho e, após a virada, passa ao mês seguinte;
-2. `header-competencia`: o segmento anterior à virada pertence ao mês anterior e o segmento após a virada pertence ao mês/ano do cabeçalho;
-3. `filename-fallback`: data do nome do arquivo, usada somente como pista auxiliar.
+Para cada página são obtidos tokens com:
 
-As hipóteses são pontuadas por:
+- texto;
+- coordenada X;
+- coordenada Y;
+- largura aproximada.
 
-- concordância entre cada data calculada e o dia da semana impresso na escala;
-- sobreposição com o período do espelho de ponto já carregado;
-- data encontrada no nome do arquivo, com peso muito menor.
+Os tokens são agrupados em linhas por proximidade vertical. A geometria continua sendo a referência para posicionar células na grade.
 
-A hipótese com maior evidência é usada. Em empate ou baixa concordância, o PDF é bloqueado como ambíguo.
+## 3. Detecção da grade de dias
 
-### 4. Dias da semana
+O parser procura grupos horizontais contendo números de `1` a `31`.
 
-A linha `seg/ter/qua/qui/sex/sáb/dom` é tratada como checksum temporal. Ela não é decorativa.
+Uma candidata precisa:
 
-Exemplo: se a coluna 11 é `sáb`, a data inferida para aquela coluna precisa efetivamente cair em sábado. Essa verificação evita deslocar a escala em um mês inteiro e ainda assim produzir um percentual aparentemente válido.
+- ter pelo menos 20 colunas de dia;
+- apresentar sequência temporal coerente, incluindo a virada `28/29/30/31 → 1`;
+- apresentar espaçamento horizontal suficientemente regular.
 
-### 5. Nome e Cargo
+A pontuação combina coerência da sequência e regularidade geométrica. Grades abaixo do limiar não são usadas.
 
-- Localizar os rótulos `Nome` e `Cargo`.
-- Calcular dinamicamente as fronteiras entre as áreas de Nome, Cargo e primeira coluna de data.
-- Para cada linha de códigos, ler Nome e Cargo apenas à esquerda da grade.
-- Dicionário de cargos é usado somente como contingência, não como delimitador principal.
+## 4. Alinhamento temporal com a competência
 
-### 6. Códigos por célula
+A lista esperada de datas vem do período já validado no espelho.
+
+Quando o PDF contém mês/ano explícitos, os números das colunas são convertidos para datas desse calendário e somente datas que realmente pertencem à competência do espelho são alinhadas.
+
+Quando não existe calendário explícito utilizável, os números dos dias são alinhados sequencialmente contra os dias esperados do espelho, sem criar datas que não estejam na fonte.
+
+A data encontrada no nome do arquivo é apenas diagnóstico de fechamento; ela não substitui a evidência temporal da grade.
+
+## 5. Nome, cargo e códigos por célula
 
 Códigos reconhecidos:
 
@@ -77,81 +77,140 @@ Códigos reconhecidos:
 - folga/ausência: `F`, `FER`, `AF`, `AB`, `AL`, `FF`, `FC`, `NC`, `AE`;
 - flexível: `D`.
 
-Cada token é associado à coluna cuja coordenada X é a mais próxima. Tokens encontrados fora do limite da grade são descartados. Isso impede que a legenda lateral seja interpretada como escala.
+O parser executa duas leituras complementares:
 
-### 7. Leitura dupla
+### Geometria
 
-Quando há camada de texto:
+- define os centros X das colunas de dia;
+- associa cada token de código à coluna mais próxima;
+- lê nome/cargo à esquerda da grade;
+- descarta tokens fora da área temporal.
 
-- matriz espacial por coordenadas;
-- leitura textual da linha;
-- as duas matrizes são cruzadas e usadas para preencher lacunas.
+### Linha textual
 
-A geometria tem prioridade para a posição temporal; o texto ajuda em nomes/cargos e células ausentes.
+- lê os tokens sequenciais da linha;
+- separa prefixo de nome/cargo da sequência de códigos;
+- produz uma segunda matriz para comparação.
 
-### 8. Legenda de turnos
+Quando existem colaboradores em comum nas duas leituras, a concordância célula a célula é medida. A geometria permanece a referência principal, mas a leitura linear pode ser usada quando apresenta evidência melhor sob as regras do parser.
 
-A legenda é extraída separadamente por padrões `Txx | HH:MM às HH:MM`.
+## 6. Cobertura temporal obrigatória
 
-Antes de liberar o arquivo:
+Para PDF RC57, a grade alinhada precisa cobrir pelo menos **95% das datas da competência do espelho**.
 
-- listar todos os `Txx` efetivamente usados na matriz;
-- verificar quantos possuem horário na legenda;
-- bloquear se a cobertura dos turnos ficar abaixo do limite de segurança.
+Se a cobertura ficar abaixo desse limite:
 
-### 9. OCR
+- o PDF é bloqueado;
+- os dias faltantes são informados no diagnóstico quando disponíveis;
+- nenhuma data ausente é inferida para completar artificialmente a competência.
 
-OCR é contingência, não primeira opção.
+Isso significa que a política efetiva do PDF é mais rígida que o motor final de interseção usado por outras fontes.
+
+## 7. Legenda de turnos
+
+A legenda é extraída por padrões equivalentes a `Txx | HH:MM às HH:MM`.
+
+Antes de gerar a matriz final:
+
+- todos os turnos `Txx` usados pelos colaboradores são listados;
+- cada turno utilizado precisa possuir horário reconhecido na legenda;
+- qualquer turno utilizado sem horário bloqueia o PDF.
+
+OCR não é acionado para contornar uma falha de legenda já comprovada.
+
+## 8. OCR contingencial
+
+OCR é segunda extração, nunca primeira escolha para a grade completa.
+
+A RC57 permite OCR integral somente quando a leitura textual falha por **insuficiência estrutural da grade**. Há também uma exceção controlada quando o cabeçalho já foi previamente confirmado por OCR e a camada textual completa não consegue reiterar a loja.
 
 Fluxo:
 
-1. tentar camada textual do PDF;
-2. se a matriz tiver baixa confiança, renderizar a página em alta resolução;
-3. OCR com coordenadas das palavras;
-4. executar exatamente o mesmo algoritmo geométrico sobre as coordenadas do OCR;
-5. bloquear se o preenchimento médio das células continuar baixo.
+1. carregar Tesseract.js 5.x via `ADERENCIA_ENSURE_OCR()`;
+2. renderizar cada página em escala ampliada;
+3. reconhecer palavras e suas caixas delimitadoras;
+4. converter as caixas para o mesmo sistema de coordenadas usado pelo parser textual;
+5. reconstruir linhas;
+6. executar novamente **a mesma função de parsing e os mesmos gates** de loja, período, grade, cobertura e legenda.
 
-Assim, PDF textual e PDF-imagem usam o mesmo motor lógico após a etapa de extração.
+OCR **não é elegível** como segunda tentativa para:
 
-## Qualidade da leitura
+- loja comprovadamente divergente;
+- cobertura temporal inferior a 95%;
+- turno utilizado sem horário na legenda.
 
-A confiança do PDF é composta por métricas independentes:
+Portanto, OCR aumenta a capacidade de extração, mas não reduz a exigência de evidência.
 
-- sequência dos dias;
-- regularidade geométrica das colunas;
-- concordância dos dias da semana;
-- preenchimento médio das células;
-- cobertura da legenda de turnos;
-- consistência das linhas de colaboradores.
+## 9. Conversão para XLSX sintético
 
-Além do percentual resumido, o objeto `window.ADERENCIA_PDF_DEBUG` guarda:
+Depois que o PDF passa por todos os gates, a matriz é convertida em um arquivo sintético:
 
-- período escolhido;
-- hipóteses de data e suas pontuações;
-- concordância de weekdays;
-- preenchimento das linhas;
-- turnos sem legenda;
-- uso de OCR.
+`PDF_GRID_RC57_MLxx.xlsx`
 
-## Períodos parciais
+Esse arquivo contém:
 
-A regra de cálculo deve operar apenas na interseção entre o período do espelho e o período disponível na escala.
+- loja confirmada;
+- datas alinhadas;
+- Nome;
+- Cargo;
+- códigos diários;
+- legenda de turnos.
 
-Exemplo:
+O XLSX sintético segue para as mesmas camadas posteriores do motor. O guard de proveniência RC55 impede que uma grade sintética de uma loja seja relabelada para outra.
 
-- espelho: 11/06 a 10/07;
-- escala: 01/06 a 30/06;
-- análise efetiva: 11/06 a 30/06.
+## 10. Invalidação de estado antigo
 
-Dias fora da interseção não entram no denominador e não geram penalização.
+Ao selecionar um novo PDF de escala, o guard RC57 invalida o estado interno da escala anterior antes de validar o novo arquivo.
 
-## Critérios de aceite antes de release
+Se o novo PDF for bloqueado:
 
-1. PDF de referência deve reconhecer todas as 31 colunas e todas as linhas legíveis.
-2. Dia da semana deve ter concordância temporal >= 95% quando disponível.
-3. Preenchimento médio das células >= 90%; alvo operacional >= 97%.
-4. Nenhum item da legenda lateral pode entrar na matriz de colaborador.
-5. Todos os turnos utilizados precisam ser resolvidos pela legenda, salvo exceção explicitamente diagnosticada.
-6. Excel e PDF que representam a mesma escala devem produzir a mesma matriz ou divergência explicada célula a célula.
-7. Um PDF de imagem deve passar pelo OCR e produzir a mesma estrutura final usada pelo PDF textual.
-8. PDF ambíguo deve ser bloqueado, nunca convertido em um percentual silenciosamente.
+- o resultado anterior fica oculto;
+- o botão de cálculo permanece desabilitado;
+- a escala anterior não pode ser reutilizada silenciosamente.
+
+## 11. Segurança de PDF
+
+As chamadas PDF.js usadas pela RC57 mantêm:
+
+- `isEvalSupported=false`;
+- scripting desabilitado.
+
+Tesseract.js permanece fora do startup normal e só é carregado quando o OCR é realmente necessário.
+
+## 12. Diagnóstico
+
+Por compatibilidade histórica, o objeto de debug continua usando o nome `ADERENCIA_PDF_DEBUG_RC28`, porém o campo `version` identifica `RC57` na execução atual.
+
+Entre as evidências registradas estão:
+
+- loja encontrada;
+- candidatos de loja;
+- loja esperada do espelho;
+- período do ponto;
+- dias brutos;
+- índices alinhados;
+- datas efetivas;
+- cobertura;
+- colaboradores;
+- concordância entre matrizes;
+- origem textual/OCR;
+- erro de bloqueio, quando existente.
+
+## Critérios de aceite RC57
+
+1. O cabeçalho precisa confirmar a mesma loja do espelho.
+2. Cabeçalho ambíguo deve ser bloqueado.
+3. A grade precisa possuir estrutura temporal coerente.
+4. O alinhamento com a competência precisa atingir pelo menos 95%.
+5. Dias ausentes não podem ser fabricados.
+6. Deve haver pelo menos três colaboradores válidos na matriz PDF.
+7. Todos os turnos utilizados precisam possuir horário reconhecido.
+8. Falha estrutural textual pode usar OCR; falhas de loja, cobertura ou legenda não podem ser contornadas por OCR.
+9. PDF-imagem aprovado por OCR deve atravessar os mesmos gates do PDF textual.
+10. A troca para um novo PDF deve invalidar a escala anterior antes da validação.
+11. A matriz validada deve produzir `PDF_GRID_RC57_MLxx.xlsx` com a mesma loja confirmada.
+12. A suíte E2E precisa permanecer verde antes de considerar a rodada certificada.
+
+## Observação sobre especificações históricas
+
+Versões anteriores deste documento descreviam hipóteses temporais e checksums de dia da semana que não correspondem integralmente ao parser ativo RC57. Este documento descreve o **comportamento operacional efetivamente implementado** na candidata atual; ideias históricas que não estejam no código não são tratadas como garantias de runtime.

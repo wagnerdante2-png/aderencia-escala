@@ -5,14 +5,14 @@ Aplicação web local, sem backend e sem banco externo, para calcular a aderênc
 ## Entradas
 
 1. **Espelho de ponto:** PDF mensal contendo os colaboradores da loja.
-2. **Escala:** preferencialmente `.xlsx`, `.xlsm` ou `.xls`; também aceita PDF exportado da Escala Operacional como contingência.
+2. **Escala planejada:** preferencialmente `.xlsx`, `.xlsm` ou `.xls`; PDF exportado da Escala Operacional é aceito como contingência.
 
-O processamento acontece no próprio navegador. Os arquivos selecionados não são enviados para um servidor por esta aplicação.
+O processamento dos arquivos ocorre no navegador. A aplicação não envia os arquivos selecionados para um backend próprio.
 
-## Regra
+## Regra de aderência
 
 - usa a **primeira entrada real do dia** no espelho de ponto;
-- marcações `P` (pré-assinaladas) não são tratadas como batida real;
+- marcações `P` pré-assinaladas não são tratadas como batida real;
 - compara a primeira entrada efetiva com a **entrada prevista do turno** na escala;
 - diferença de até **90 minutos**: sem penalização;
 - diferença acima de **90 minutos**: penalização de **1 ponto**;
@@ -20,7 +20,7 @@ O processamento acontece no próprio navegador. Os arquivos selecionados não s�
 - fórmula: `1 - (desvios + 10 × não conformidades) / total de marcações consideradas`;
 - o resultado visual é limitado entre 0% e 100%.
 
-O sistema também valida loja/período, normaliza nomes, sinaliza colaboradores não conciliados e bloqueia somente combinações sem qualquer interseção de datas.
+Antes de liberar o cálculo, as camadas de leitura podem bloquear a escala quando loja, período, estrutura, colaboradores ou legenda de turnos não possuem evidência suficiente.
 
 ## Competência operacional
 
@@ -30,27 +30,24 @@ A competência mensal é definida pelo **início do período integral do espelho
 - `11/07/2026 a 10/08/2026` = **Julho/2026**;
 - `11/12/2026 a 10/01/2027` = **Dezembro/2026**.
 
-A data final da escala ou a data final da interseção não define a competência.
+A data final da escala ou da interseção não redefine a competência.
 
-Se a escala cobrir somente parte do ciclo do espelho, inclusive casos como `01–30` ou `01–31`, o cálculo é feito proporcionalmente somente nos dias existentes na interseção. O resultado não é rejeitado apenas porque a escala não cobre todos os dias do espelho.
+### Cobertura temporal: regra por fonte
 
-Essa mesma competência é usada em Histórico, painel LED, Monitoramento, Semestral, Divergências, Evolução, processamento em lote e exportações.
+O motor final trabalha sobre a interseção entre datas válidas do ponto e da escala, mas as camadas de pré-validação não são igualmente permissivas para todas as fontes:
 
-## Competência global RC40
+- **Excel/XLSM/XLS:** o pré-processamento tenta normalizar a grade contra a competência do espelho. Se a normalização segura não se aplica, o arquivo pode seguir para o parser principal. Quando esse parser reconhece a estrutura com segurança, o cálculo final usa a interseção disponível.
+- **PDF de escala RC57:** é contingência fail-closed. A matriz precisa cobrir pelo menos **95% da competência do espelho**, sem fabricar datas ausentes. Cobertura inferior é bloqueada antes do cálculo.
 
-A RC40 unifica o seletor de **Mês / Ano** no painel superior. Ele passa a ser a referência temporal de todo o ecossistema de visualização.
+Portanto, “escala parcial” não é uma autorização universal: a aceitação depende da fonte e das evidências estruturais encontradas.
 
-Ao alterar a competência global, são sincronizados automaticamente:
+A mesma competência canônica é propagada para Histórico, painel LED, Monitoramento, Semestral, Divergências, Evolução, processamento em lote e exportações.
 
-- Histórico;
-- Monitoramento;
-- Divergências;
-- Semestral pelo ano correspondente;
-- painel LED;
-- aba Evolução;
-- relatórios e exportações que utilizam esses filtros.
+## Competência global
 
-Os seletores mensais duplicados das telas internas ficam ocultos para reduzir risco de leituras contraditórias. A competência apurada pelo motor continua prevalecendo no momento de salvar uma análise: um espelho `11/06–10/07` sempre conduz o sistema para **Junho/2026**, independentemente do mês que estivesse sendo visualizado antes do cálculo.
+O seletor superior de **Mês / Ano** é a referência temporal das visualizações. Ele sincroniza Histórico, Monitoramento, Divergências, Evolução, painel LED, Semestral pelo ano e relatórios relacionados.
+
+No momento de salvar uma análise, a competência apurada pelo espelho prevalece sobre o período que estivesse sendo apenas visualizado.
 
 ## Estruturas reconhecidas
 
@@ -58,21 +55,42 @@ Os seletores mensais duplicados das telas internas ficam ocultos para reduzir ri
 
 Procura os metadados `Espelho do Ponto`, `Matrícula`, `Nome`, `Departamento / ML`, as linhas diárias e as marcações efetivas `O` ou `I`. Marcações `P` são filtradas pela camada semântica e não compõem a batida real.
 
-### Escala Excel/XLSM
+A loja do ponto é a âncora de identidade usada para validar a escala.
 
-É a fonte preferencial. O motor procura as abas operacionais conhecidas, identifica `Nome`, `Cargo`, as datas, os códigos diários (`T1`, `T2`, `F`, `FER`, `AF` etc.) e a legenda de turnos (`Txx | hh:mm às hh:mm`). Macros não são executadas.
+### Escala Excel/XLSM/XLS
 
-### Escala PDF
+É a fonte preferencial. O motor procura grades operacionais, identifica `Nome`, `Cargo`, datas, códigos diários (`T1`, `T2`, `F`, `FER`, `AF` etc.) e a legenda de turnos (`Txx | hh:mm às hh:mm`). Macros não são executadas.
 
-É uma contingência. O sistema reconstrói a matriz visual Nome × Dias por posição dos elementos do PDF, associa cada célula às datas reconhecidas e usa OCR como fallback quando o texto estrutural não é suficiente. Quando somente parte do ciclo do espelho estiver presente, a análise considera a interseção disponível.
+As camadas RC51/RC52/RC53 tratam estruturas alternativas, grades mensais e normalizações, preservando a loja e a competência já reconhecidas no espelho. O guard RC55 impede que uma grade sintética seja relabelada para outra loja.
+
+### Escala PDF — RC57
+
+PDF é uma contingência e recebe validações adicionais:
+
+1. o cabeçalho da primeira página precisa confirmar a mesma loja do espelho;
+2. `MLxx` tem prioridade sobre `LOJA xx`; cabeçalho ambíguo é bloqueado;
+3. a camada textual é tentada primeiro;
+4. se o cabeçalho não tiver texto suficiente, OCR é carregado sob demanda apenas para validar o topo da primeira página;
+5. se a leitura textual da grade falhar por insuficiência estrutural, o PDF inteiro pode ser lido por OCR;
+6. as coordenadas obtidas por OCR passam pelo **mesmo parser rígido** usado na leitura textual;
+7. OCR não é usado para contornar loja divergente, cobertura temporal insuficiente ou turno sem horário;
+8. a matriz PDF validada é convertida em um XLSX sintético `PDF_GRID_RC57_MLxx.xlsx` antes de seguir para o motor.
+
+O OCR é contingência, não primeira opção.
+
+## Segurança e qualidade da leitura
+
+- PDF.js é executado com `isEvalSupported=false` e scripting desabilitado pelas camadas de segurança;
+- Tesseract.js não é carregado no startup; `ADERENCIA_ENSURE_OCR()` o carrega somente quando necessário;
+- a leitura PDF exige identidade de loja, alinhamento temporal, quantidade mínima de colaboradores e resolução da legenda de turnos;
+- datas ausentes no PDF RC57 não são inferidas para completar artificialmente a competência;
+- ao selecionar um novo PDF, o estado anterior da escala é invalidado antes da nova validação, evitando reutilizar silenciosamente uma escala antiga após bloqueio.
 
 ## Diagnóstico estrutural
 
-A camada paralela de inspeção não altera a fórmula de aderência. Ela produz uma representação canônica `Funcionário × Data × Código`, mede continuidade temporal, cobertura da matriz, quantidade de colaboradores e células não classificadas e disponibiliza o botão **Diagnóstico da leitura**.
+A aplicação mantém informações de diagnóstico da leitura sem alterar a fórmula de aderência. Para o parser PDF RC57, `ADERENCIA_PDF_DEBUG_RC28` preserva o nome legado do objeto de debug, mas registra a versão efetiva, fonte textual/OCR, loja, período, cobertura e demais evidências do parser atual.
 
-Esse diagnóstico funciona tanto com Excel/XLSM/XLS quanto com o XLSX sintético produzido quando uma escala PDF é interpretada.
-
-A RC40 mantém ainda uma auditoria não destrutiva em tempo de execução. Em operação normal, `ADERENCIA_RC40_HEALTH.ok` deve permanecer `true` no console do navegador.
+O health check consolidado continua disponível em `ADERENCIA_RC50_HEALTH` por compatibilidade histórica. Em uma inicialização válida da RC57, `ADERENCIA_RC50_HEALTH.ok` deve ser `true`.
 
 ## Histórico, lojas, regionais e base portátil
 
@@ -86,69 +104,32 @@ A RC40 mantém ainda uma auditoria não destrutiva em tempo de execução. Em op
 - gravação automática da base vinculada após alterações persistentes;
 - histórico, divergências, configuração administrativa e cadastro de lojas/regionais fazem parte da base portátil;
 - monitoramento baseado nas lojas cadastradas, sem quantidade fixa de unidades;
-- visão semestral;
-- divergências por colaborador;
-- relatórios PDF;
-- exportação Excel do monitoramento mensal para BI;
+- visão semestral, recorrência e evolução;
+- relatórios PDF e exportação Excel do monitoramento mensal;
 - backup/restauração manual continua disponível como contingência.
-
-## Mini painel LED da rede
-
-O painel compacto superior é também o **seletor mestre de competência**. Para a competência selecionada ele mostra:
-
-- média de aderência da rede;
-- quantidade de lojas verdes (≥95%);
-- quantidade de lojas amarelas (80% a 94,99%);
-- quantidade de lojas vermelhas (<80%);
-- quantidade de lojas sem resultado;
-- cobertura da rede no mês.
-
-## Evolução
-
-A aba **Evolução** permite acompanhar o ano inteiro com visual combinado:
-
-- barras = aderência mensal da seleção atual;
-- linha = média mensal da rede;
-- filtros por regional e loja;
-- destaque para o mês da competência global;
-- variação contra o mês anterior;
-- quantidade de lojas com resultado no mês e tamanho da base selecionada;
-- linhas de referência de 80% e 95%.
-
-Meses sem dados não são ligados artificialmente pela linha, evitando sugerir continuidade onde não existe resultado salvo.
-
-## Administrador
-
-O menu **Administrador** não possui senha e contém uma flag para habilitar ou ocultar o botão **Limpar histórico**. A configuração também é preservada na base portátil.
-
-Quando o histórico é efetivamente zerado, os detalhes de divergências vinculados ao histórico também são limpos para impedir reaparecimento de dados antigos.
 
 ## Processamento em lote
 
-A aba de lote reutiliza o mesmo motor da análise individual. Cada par de arquivos é processado sequencialmente. Erros de leitura, loja ou período interrompem apenas aquela linha e são exibidos diretamente no lote.
-
-O salvamento em lote usa a mesma regra canônica: a competência vem do início do período integral do espelho de cada linha.
-
-## Divergências por colaborador
-
-O detalhamento persiste apenas ocorrências que reduziram efetivamente o score e confere os totais contra o motor principal antes de gravar. A competência do detalhamento também usa o início do período integral do espelho, mesmo em análises proporcionais por interseção.
-
-## Segurança de PDF
-
-A aplicação força `isEvalSupported=false` no PDF.js antes de carregar os parsers, reduzindo a superfície de execução dinâmica ao abrir PDFs locais.
+A aba de lote reutiliza os mesmos inputs e o mesmo motor da análise individual. Cada par de arquivos é processado sequencialmente; erros de leitura, loja ou período interrompem apenas aquela linha. Assim, os gates RC51–RC57 também se aplicam ao lote.
 
 ## Executar localmente
 
 1. Baixe o pacote em ZIP.
 2. Extraia a pasta.
 3. Abra `index.html` com duplo clique.
-4. Preferencialmente use Edge ou Chrome atualizado.
+4. Preferencialmente use Microsoft Edge ou Google Chrome atualizado.
 5. Clique em **Criar base** na primeira utilização e salve `aderencia-dados.json` junto da aplicação.
+6. Carregue primeiro o espelho de ponto e aguarde o reconhecimento da loja/período.
+7. Depois carregue a escala planejada e calcule somente quando a leitura estiver reconhecida.
 
 Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
 
-**Importante:** PDF.js, SheetJS, jsPDF e Tesseract são carregados por CDN. Portanto, a aplicação processa os arquivos localmente, mas precisa de conexão com a internet ao abrir a página para carregar essas bibliotecas.
+## Dependências externas
+
+No startup são carregados por CDN PDF.js, SheetJS/XLSX e jsPDF. **Tesseract.js 5.x é carregado somente sob demanda**, quando o OCR é realmente necessário. Por isso, a aplicação processa os arquivos localmente, mas precisa de conexão com a internet para obter as dependências que ainda não estejam disponíveis no navegador.
 
 ## Versão
 
-Candidata operacional consolidada: **v1.0 RC40**.
+Candidata operacional atual: **v1.0 RC57**.
+
+A esteira E2E certifica a inicialização, integridade, navegação e regressões funcionais da candidata antes de uma rodada ser considerada concluída.
