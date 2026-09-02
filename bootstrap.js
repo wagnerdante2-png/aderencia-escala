@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-window.ADERENCIA_VERSION='v1.0 RC61';
+window.ADERENCIA_VERSION='v1.0 RC62';
 const REQUIRED=[['pdfjsLib','leitor de PDF'],['XLSX','leitor de Excel']];
 const OPTIONAL=[['jspdf','gerador de relatórios PDF']];
 function setStatus(id,text){const e=document.getElementById(id);if(!e)return;e.textContent=text;e.classList.remove('muted','ok');e.classList.add('error')}
