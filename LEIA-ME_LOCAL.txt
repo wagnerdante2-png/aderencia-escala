@@ -1,67 +1,67 @@
-ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC61
+ADERÊNCIA DE ESCALA — EXECUÇÃO LOCAL — v1.0 RC62
 
 1. Extraia integralmente a pasta do pacote.
 2. Abra index.html com duplo clique, preferencialmente no Microsoft Edge ou Google Chrome atualizado.
 3. Na primeira utilização, clique em "Criar base" e salve aderencia-dados.json, de preferência dentro da própria pasta da aplicação.
 4. Em outro computador, use "Vincular base" e selecione o mesmo aderencia-dados.json para recuperar histórico, divergências, configurações e cadastro de lojas/regionais.
 5. Selecione primeiro o PDF do espelho de ponto e aguarde o reconhecimento da loja e do período.
-6. Depois selecione a escala planejada em XLSX, XLSM, XLS ou PDF.
+6. Depois selecione a escala planejada em XLSX/XLSM/XLS ou PDF.
 7. Somente quando ponto e escala estiverem reconhecidos, clique em Calcular aderência.
 8. Antes de confiar em uma leitura incomum, confira o painel de qualidade e os diagnósticos disponíveis.
 9. Salve o resultado no histórico quando a análise estiver validada.
 
-RC61 — FRONT-DOOR ADAPTATIVO DA ESCALA
+COMPETÊNCIA
 
-A RC61 é a camada principal de entrada da escala. O arquivo original é classificado e normalizado antes de chegar aos parsers históricos. A normalização gera uma grade canônica para o motor sem executar macros do XLSM.
+O mês pertence ao início do período integral do espelho. Exemplo: 11/06 a 10/07 = Junho; 11/07 a 10/08 = Julho.
 
-IDENTIDADE DA LOJA
+RC62 — ESCALA DE FOLGAS ESPARSA
 
-A loja reconhecida no espelho de ponto é a âncora da análise. Na RC61, o nome do arquivo ou um cabeçalho "MLxx" da escala não são, isoladamente, requisitos de aceite. A identidade da escala é conciliada principalmente pela população de colaboradores/matrículas contra o espelho já reconhecido. População sem correspondência mínima é bloqueada para evitar processar uma escala de origem incompatível.
+A RC62 reconhece explicitamente arquivos identificados como "Escala de Folgas". Nessa estrutura, células vazias não significam automaticamente ausência de informação: normalmente os eventos especiais, como F, FER, AF e equivalentes, são materializados e os dias normais de trabalho permanecem em branco.
+
+Para esse formato específico, a aplicação preserva cada código explícito na data definida pela posição da célula e usa o quadro "Horários" do próprio espelho de ponto para reconstruir somente os dias vazios do colaborador conciliado. A aplicação não inventa um horário e não copia o turno de outro funcionário. Quando o horário previsto do espelho corresponde a um turno já existente na legenda, o mesmo código é reutilizado; quando não existe código equivalente, é criado um código técnico interno somente para transportar aquele horário até o motor de cálculo.
+
+O modo híbrido só é habilitado com evidência explícita de "Escala de Folgas". Um PDF operacional comum não recebe esse preenchimento automaticamente. A RC62 também reconhece WCA como cargo operacional válido para a leitura dessa estrutura.
+
+COBERTURA E SEGURANÇA
+
+A RC62 não exige que um PDF cubra 95% dos dias do período para sequer ser lido. O cálculo trabalha sobre a interseção temporal válida entre espelho e escala. Entretanto, o motor mantém um gate separado de cobertura estrutural: depois de conciliar colaboradores e reconstruir com segurança os dias de uma Escala de Folgas, pelo menos 95% das marcações dos colaboradores conciliados precisam estar cobertas por informação utilizável. Se a reconstrução não for suficiente, o resultado continua bloqueado. Esse gate não deve ser removido para forçar um resultado.
+
+PERÍODO INCOMPATÍVEL
+
+Quando a escala pertence a um período que não cruza o período do espelho, a RC62 informa claramente os dois intervalos e bloqueia o processamento. Um erro de período não deve aparecer apenas como "grade Nome × Dias não reconhecida".
+
+PDF DIGITALIZADO / IMAGEM
+
+A leitura textual continua sendo a primeira opção. Quando o PDF não possui camada de texto suficiente, a RC62 aciona OCR sob demanda. Para documentos digitalizados ou exportados com orientação inadequada, o OCR pode tentar as orientações 0°, 90°, 270° e 180°. Assim que uma evidência semântica forte é encontrada — por exemplo, período incompatível, população incompatível ou turno explícito sem legenda — a aplicação interrompe tentativas alternativas e mantém o bloqueio.
+
+PDF COM TEXTO
+
+PDFs operacionais densos continuam usando o parser adaptativo RC61 já certificado. A RC62 atua como front door de PDF e delega estruturas normais ao parser existente, preservando as regressões anteriores.
+
+EXCEL/XLSM/XLS
+
+O fluxo de Excel continua sob a política adaptativa RC61/RC59. Matrículas, nomes, datas, códigos materializados, legenda de turnos e horários previstos do espelho são reconciliados sem executar macros. Evidência forte de loja divergente continua fail-closed.
 
 POPULAÇÃO
 
-Diferenças legítimas de população entre ponto e escala podem existir por admissões, desligamentos e alterações ocorridas no período. A RC61 trabalha com a população conciliada; não exige que os dois arquivos tenham exatamente a mesma quantidade de pessoas. Colaboradores que não puderem ser conciliados não são inventados nem relabelados.
+Admissões, desligamentos, férias e diferenças reais de quadro podem produzir números distintos entre ponto e escala. A aplicação tenta conciliação por matrícula/nome e não exige igualdade absoluta de quantidade. População sem correspondência mínima segura é bloqueada.
 
-PERÍODO E PROPORCIONALIDADE
+ESTADO ANTERIOR
 
-A competência continua sendo o mês/ano do início do período integral do espelho. Exemplo: 11/06 a 10/07 = Junho; 11/07 a 10/08 = Julho.
+Ao iniciar uma nova escala, o resultado anterior é ocultado e o botão Calcular permanece desabilitado enquanto a nova entrada é validada. Uma escala rejeitada não deve reutilizar silenciosamente o arquivo anterior.
 
-A grade canônica usa as datas reais comuns entre espelho e escala. Assim, uma escala mensal 01→30/31 pode ser comparada proporcionalmente com um espelho 11→10, inclusive atravessando meses. A RC61 não exige artificialmente 95% de cobertura para que um PDF seja aceito; ela exige evidência estrutural suficiente, datas utilizáveis, população conciliada e turnos resolvidos no período efetivamente disponível.
+COMPETÊNCIA GLOBAL, HISTÓRICO E BASE PORTÁTIL
 
-TURNOS E VERSÕES DA ESCALA
-
-Códigos como T1, T6 etc. não têm significado fixo entre versões. A RC61 lê a legenda da própria versão/arquivo e associa o código ao horário encontrado nela. O mesmo código pode, portanto, representar horários diferentes em modelos diferentes sem reutilizar silenciosamente a legenda de outro modelo.
-
-EXCEÇÕES DIÁRIAS
-
-Quando o espelho contém uma previsão/alteração específica para uma data, a exceção vale para aquela data. Ela não é propagada automaticamente para os dias seguintes. Na ausência de exceção exata, aplica-se a previsão válida correspondente.
-
-PDF E OCR
-
-A leitura textual do PDF é tentada primeiro. Se a estrutura textual for insuficiente, Tesseract.js pode ser carregado sob demanda para OCR. PDF digitalizado e PDF textual passam pela mesma política RC61: calendário reconhecível, população conciliável e legenda dos turnos utilizados. OCR não serve para fabricar população, datas ou horários inexistentes.
-
-SEGURANÇA DE ESTADO
-
-Ao iniciar a leitura de uma nova escala, o cálculo anterior não deve ser reutilizado silenciosamente. Se a nova entrada não puder ser normalizada com segurança, o botão de cálculo permanece desabilitado até que uma escala válida seja reconhecida.
-
-COMPETÊNCIA GLOBAL E HISTÓRICO
-
-O seletor Mês/Ano do painel superior é a competência global. Histórico, Monitoramento, Divergências, Evolução, Semestral pelo ano e exportações relacionadas acompanham essa referência temporal. Ao salvar uma análise, a competência apurada pelo espelho prevalece.
-
-BASE PORTÁTIL
+O seletor Mês/Ano do painel superior é a competência global usada por Histórico, Monitoramento, Divergências, Evolução, Semestral e exportações relacionadas. Ao salvar uma análise, a competência apurada pelo espelho prevalece.
 
 O histórico continua existindo no navegador como cache/contingência. Quando uma base portátil está vinculada e autorizada, alterações persistentes são gravadas automaticamente no JSON.
 
-O menu Lojas permite cadastrar novas unidades e atribuir uma regional sem alterar o programa. ML61 Vinhedo pertence a Guardiões da Chama.
-
-O menu Administrador permite habilitar ou ocultar o botão "Limpar histórico". Não há senha. Quando o histórico é apagado, as divergências relacionadas também são zeradas e a base portátil vinculada recebe a alteração.
-
 DEPENDÊNCIAS E PRIVACIDADE
 
-PDF.js, SheetJS/XLSX e jsPDF são obtidos por CDN no startup. Tesseract.js 5.x não é carregado na abertura normal; é carregado somente quando uma contingência OCR é necessária. Os arquivos analisados permanecem no navegador e não são enviados para um backend próprio desta aplicação.
-
-Não é necessário Git, Python, PowerShell, Codespaces ou servidor local.
+PDF.js, SheetJS/XLSX e jsPDF são obtidos por CDN no startup. Tesseract.js 5.x NÃO é carregado na abertura normal; ele é carregado somente quando uma contingência OCR é necessária. Os arquivos analisados permanecem no navegador e não são enviados para um backend próprio desta aplicação.
 
 SAÚDE DO RUNTIME
 
-Por compatibilidade histórica, o health check consolidado continua em ADERENCIA_RC50_HEALTH. Na RC61 validada, window.ADERENCIA_VERSION deve ser "v1.0 RC61", window.ADERENCIA_SCHEDULE_ADAPTIVE_RC61 deve estar ativo e ADERENCIA_RC50_HEALTH.ok deve ser true.
+Por compatibilidade histórica, o health check consolidado continua em ADERENCIA_RC50_HEALTH. Na RC62 validada, window.ADERENCIA_VERSION deve ser "v1.0 RC62", window.ADERENCIA_SCHEDULE_ADAPTIVE_RC62.version deve iniciar com "RC62" e ADERENCIA_RC50_HEALTH.ok deve ser true.
+
+Não é necessário Git, Python, PowerShell, Codespaces ou servidor local para usar o pacote Windows de teste.
