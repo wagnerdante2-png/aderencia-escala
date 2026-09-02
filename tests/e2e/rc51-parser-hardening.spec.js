@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/index.html');
-  await page.waitForFunction(() => window.ADERENCIA_SCHEDULE_HARDENING && window.XLSX);
+  await page.waitForFunction(() => window.ADERENCIA_SCHEDULE_HARDENING && window.ADERENCIA_PDF_CALENDAR_RC55 && window.XLSX);
 });
 
 test('RC51 point context reuses already validated store and competence', async ({ page }) => {
@@ -57,9 +57,49 @@ test('RC51 normalizer prefers validated point store over stale workbook template
   expect(result.legend).toContain('08:00');
 });
 
-test('RC54 ML11 monthly PDF uses calendar month instead of day-number remapping', async ({ page }) => {
+test('RC55 rejects schedule store evidence that conflicts with the point store', async ({ page }) => {
   const result = await page.evaluate(() => {
-    const api=window.ADERENCIA_PDF_CALENDAR_RC54;
+    const api=window.ADERENCIA_PDF_CALENDAR_RC55;
+    let mismatch='';
+    try{api.resolveStore(['ML10'],'ML10','ML11')}catch(e){mismatch=String(e.message)}
+    return {mismatch,staleTemplate:api.resolveStore(['ML01'],'ML08','ML08')};
+  });
+  expect(result.mismatch).toContain('ML10');
+  expect(result.mismatch).toContain('ML11');
+  expect(result.mismatch).toContain('diverge');
+  expect(result.staleTemplate).toBe('ML08');
+});
+
+test('RC55 hardening never relabels a wrong-store synthetic PDF grid', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const dates = Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(2026, 5, 11 + i, 12);
+      return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+    });
+    const rows = [
+      ['ESCALA OPERACIONAL | LOJA ML10'],
+      ['PDF estruturado RC55'],
+      ['Nome','Cargo',...dates],
+      ['ANA TESTE','OPERADOR DE LOJA I',...dates.map(()=> 'T1')],
+      ['BIA TESTE','OPERADOR DE LOJA IV',...dates.map(()=> 'T1')],
+      ['CARLA TESTE','LIDER SETOR I',...dates.map(()=> 'T1')],
+      [],
+      ['T1 | 08:00 às 17:00']
+    ];
+    const ws=XLSX.utils.aoa_to_sheet(rows),wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Escala Ponto');
+    const file=new File([XLSX.write(wb,{bookType:'xlsx',type:'array'})],'PDF_GRID_RC55_ML10.xlsx');
+    let message='';
+    try{await window.ADERENCIA_SCHEDULE_HARDENING.normalizeExcel(file,{store:'ML11',start:'2026-06-11',end:'2026-07-10'})}catch(e){message=String(e.message)}
+    return {message,synthetic:window.ADERENCIA_SCHEDULE_HARDENING.isSyntheticScheduleFile(file.name)};
+  });
+  expect(result.synthetic).toBeTruthy();
+  expect(result.message).toContain('loja não pôde ser confirmada contra o espelho');
+});
+
+test('RC55 ML11 monthly PDF uses calendar month instead of day-number remapping', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const api=window.ADERENCIA_PDF_CALENDAR_RC55;
     const dates=Array.from({length:30},(_,i)=>new Date(2026,5,11+i,12));
     const aligned=api.alignRawDays(Array.from({length:31},(_,i)=>i+1),dates,'ESCALA OPERACIONAL | LOJA 11 Julho 2026');
     return {coverage:aligned.coverage,dates:aligned.pairs.map(p=>p.date.toISOString().slice(0,10)),calendar:aligned.calendar};
@@ -71,13 +111,13 @@ test('RC54 ML11 monthly PDF uses calendar month instead of day-number remapping'
   expect(result.dates).not.toContain('2026-06-11');
 });
 
-test('RC51 hardening module and RC54 PDF parser are active at startup', async ({ page }) => {
+test('RC51 hardening module and RC55 PDF parser are active at startup', async ({ page }) => {
   const state = await page.evaluate(() => ({
     hardening: window.ADERENCIA_SCHEDULE_HARDENING?.version,
     parser: window.ADERENCIA_PDF_PARSER_VERSION,
     modules: window.ADERENCIA_ACTIVE_MODULES || []
   }));
-  expect(state.hardening).toMatch(/^RC51(?:\.|$)/);
-  expect(state.parser).toBe('RC54');
+  expect(state.hardening).toBe('RC51.5');
+  expect(state.parser).toBe('RC55');
   expect(state.modules).toContain('schedule-hardening-rc51.js');
 });
