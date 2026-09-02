@@ -22,6 +22,12 @@ function validateHeader(text,expectedStore){
  if(store!==expectedStore)throw new Error(`RC57: loja do cabeçalho (${store}) diverge do espelho (${expectedStore}).`);
  return store;
 }
+function resolveHeaderWithFallback(headerText,pageText){
+ const headerStore=resolveHeaderStore(headerText);
+ if(headerStore)return{store:headerStore,source:'header-text',evidence:headerText};
+ const pageStore=resolveHeaderStore(pageText);
+ return pageStore?{store:pageStore,source:'page-text',evidence:pageText}:{store:null,source:null,evidence:headerText};
+}
 function topHeader(items,maxRows=14){
  const rs=[];
  for(const it of items.filter(i=>i.str&&String(i.str).trim()).map(i=>({text:String(i.str).trim(),x:i.transform?.[4]||0,y:i.transform?.[5]||0})).sort((a,b)=>b.y-a.y||a.x-b.x)){
@@ -37,7 +43,7 @@ async function ocrHeader(page){
  const scale=2.25,vp=page.getViewport({scale}),full=document.createElement('canvas');
  full.width=Math.ceil(vp.width);full.height=Math.ceil(vp.height);
  await page.render({canvasContext:full.getContext('2d'),viewport:vp}).promise;
- const crop=document.createElement('canvas');crop.width=full.width;crop.height=Math.max(1,Math.floor(full.height*.38));
+ const crop=document.createElement('canvas');crop.width=full.width;crop.height=Math.max(1,Math.floor(full.height*.55));
  crop.getContext('2d').drawImage(full,0,0,crop.width,crop.height,0,0,crop.width,crop.height);
  const r=await T.recognize(crop,'por+eng');
  return String(r?.data?.text||'').trim();
@@ -46,9 +52,10 @@ async function inspect(file){
  const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false,enableScripting:false}).promise;
  if(!pdf.numPages)throw new Error('RC57: PDF sem páginas legíveis.');
  const page=await pdf.getPage(1),tc=await page.getTextContent();
- let header=topHeader(tc.items),source='text',store=resolveHeaderStore(header);
- if(!store){header=await ocrHeader(page);source='ocr';store=resolveHeaderStore(header)}
- return{store,header,source,textItemCount:tc.items.filter(i=>i.str&&String(i.str).trim()).length};
+ const header=topHeader(tc.items),pageText=topHeader(tc.items,140);
+ let resolved=resolveHeaderWithFallback(header,pageText),evidence=resolved.evidence,source=resolved.source||'text',store=resolved.store;
+ if(!store){evidence=await ocrHeader(page);source='ocr';store=resolveHeaderStore(evidence)}
+ return{store,header:evidence,source,textItemCount:tc.items.filter(i=>i.str&&String(i.str).trim()).length};
 }
 function pointStore(){
  const h=window.ADERENCIA_SCHEDULE_HARDENING,c=h?.pointContext?.();
@@ -80,7 +87,7 @@ window.addEventListener('change',ev=>{
   passing=true;try{input.dispatchEvent(new Event('change',{bubbles:true}))}finally{passing=false}
  }).catch(error=>{console.warn('RC57: PDF bloqueado por identidade de loja.',error);block(error,file)}).finally(()=>{busy=false});
 },true);
-const api={version:'RC57.1',legacyVersion:'RC56.1',resolveHeaderStore,validateHeader,topHeader,ocrHeader,inspect,key,headerSourceFor(file){return api.lastAudit?.key===key(file)?api.lastAudit.source:null},get busy(){return busy},lastAudit:null,lastBlock:null};
+const api={version:'RC57.1',legacyVersion:'RC56.1',evidenceFallbackVersion:'RC60.1',resolveHeaderStore,resolveHeaderWithFallback,validateHeader,topHeader,ocrHeader,inspect,key,headerSourceFor(file){return api.lastAudit?.key===key(file)?api.lastAudit.source:null},get busy(){return busy},lastAudit:null,lastBlock:null};
 window.ADERENCIA_PDF_STORE_GUARD_RC57=api;
 window.ADERENCIA_PDF_STORE_GUARD_RC56=api;
 })();

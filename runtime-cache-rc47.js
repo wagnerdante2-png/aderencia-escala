@@ -7,12 +7,24 @@ let fileBuffers=new WeakMap();
 if(window.File?.prototype?.arrayBuffer){
   const original=File.prototype.arrayBuffer;
   File.prototype.arrayBuffer=function(){
-    let p=fileBuffers.get(this);
-    if(p){stats.fileHits++;return p}
-    stats.fileMisses++;
-    p=Promise.resolve(original.call(this)).catch(err=>{fileBuffers.delete(this);throw err});
-    fileBuffers.set(this,p);
-    return p;
+    let master=fileBuffers.get(this);
+    if(master){stats.fileHits++}
+    else{
+      stats.fileMisses++;
+      master=Promise.resolve(original.call(this)).then(buffer=>{
+        if(!(buffer instanceof ArrayBuffer))throw new TypeError('RC60: File.arrayBuffer não retornou ArrayBuffer.');
+        /*
+         * PDF.js transfere o ArrayBuffer recebido para o worker e, por padrão,
+         * destaca (detaches) o buffer no contexto chamador. Portanto o cache
+         * nunca pode devolver a mesma instância de ArrayBuffer duas vezes.
+         * Mantemos uma cópia-mestre privada que jamais é exposta e entregamos
+         * uma nova cópia independente em cada leitura.
+         */
+        return new Uint8Array(buffer).slice();
+      }).catch(err=>{fileBuffers.delete(this);throw err});
+      fileBuffers.set(this,master);
+    }
+    return master.then(bytes=>bytes.slice().buffer);
   };
 }
 /*
@@ -71,5 +83,5 @@ function clear(){
   window.ADERENCIA_PDF_CACHE_CLEAR?.();
   stats.clearedAt=new Date().toISOString();
 }
-window.ADERENCIA_RUNTIME_CACHE={version:'RC50',stats,clear,notePdf};
+window.ADERENCIA_RUNTIME_CACHE={version:'RC50',bufferSafetyVersion:'RC60.1',bufferMode:'copy-on-read',stats,clear,notePdf};
 })();

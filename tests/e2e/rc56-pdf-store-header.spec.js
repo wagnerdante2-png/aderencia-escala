@@ -41,3 +41,25 @@ test('RC56 accepts header only when it confirms the point store', async ({ page 
   const store = await page.evaluate(() => window.ADERENCIA_PDF_STORE_GUARD_RC56.validateHeader('ESCALA OPERACIONAL | LOJA 11 | ML11 - CAMPINAS','ML11'));
   expect(store).toBe('ML11');
 });
+
+test('RC60 uses explicit first-page store evidence when the top header is generic', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const api=window.ADERENCIA_PDF_STORE_GUARD_RC56;
+    return api.resolveHeaderWithFallback(
+      'ESCALA JUNHO 2026 | CARGO | COLABORADOR',
+      'ESCALA JUNHO 2026 | CARGO | COLABORADOR | UNIDADE ML45 | MATRIZ DE FOLGAS'
+    );
+  });
+  expect(result).toMatchObject({ store:'ML45', source:'page-text' });
+});
+
+test('RC60 keeps first-page fallback fail-closed when store evidence is ambiguous', async ({ page }) => {
+  const message = await page.evaluate(() => {
+    const api=window.ADERENCIA_PDF_STORE_GUARD_RC56;
+    try{return api.resolveHeaderWithFallback('ESCALA JUNHO 2026','UNIDADE ML45 | REFERÊNCIA ML46')}
+    catch(e){return String(e.message)}
+  });
+  expect(message).toContain('cabeçalho PDF ambíguo');
+  expect(message).toContain('ML45');
+  expect(message).toContain('ML46');
+});
