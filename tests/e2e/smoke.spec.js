@@ -26,14 +26,16 @@ test('startup has no uncaught errors and RC50 integrity is green', async ({ page
     transactionGuard: window.ADERENCIA_SCHEDULE_PREPROCESS?.transactionGuardVersion,
     realXlsm: window.ADERENCIA_REAL_XLSM_RC59?.version,
     adaptive: window.ADERENCIA_SCHEDULE_ADAPTIVE_RC61?.version,
+    adaptive62: window.ADERENCIA_SCHEDULE_ADAPTIVE_RC62?.version,
     version: window.ADERENCIA_VERSION
   }));
   console.log('RC50_PAGE_ERRORS', JSON.stringify(errors));
   console.log('RC50_RUNTIME_DIAG', JSON.stringify({runtimeFlag:health.runtimeFlag,runtime:!!health.runtime,pdfFlag:health.pdfFlag,pdf:health.pdf||null}));
   console.log('RC50_FAILED_CHECKS', JSON.stringify(health.failed));
   expect(errors, 'Uncaught browser errors').toEqual([]);
-  expect(health.version).toBe('v1.0 RC61');
+  expect(health.version).toBe('v1.0 RC62');
   expect(health.adaptive).toBe('RC61.1');
+  expect(health.adaptive62).toBe('RC62.0');
   expect(health.pdfStoreGuard).toBe('RC57.1');
   expect(health.pdfOcr).toBe('RC57.1');
   expect(health.sourceGuard).toBe('RC58.1');
