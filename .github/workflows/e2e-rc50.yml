@@ -20,6 +20,40 @@ jobs:
       - run: npm install
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e:chromium
+
+      - name: Build RC58 Windows test package
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="dist/ADERENCIA_ESCALA_RC58"
+          mkdir -p "$ROOT"
+          cp \
+            index.html styles.css dashboard.css \
+            bootstrap.js engine-v3.js history.js history-report.js export-report.js batch.js \
+            runtime-cache-rc47.js ocr-lazy-rc48.js portable-storage.js pdf-security-rc35.js point-semantics.js \
+            pdf-xlsx-compat-rc21.js pdf-calendar-integrity-rc29.js canonical-validation-rc35.js \
+            schedule-hardening-rc51.js schedule-monthly-bridge-rc53.js schedule-provenance-guard-rc55.js \
+            schedule-source-identity-guard-rc58.js schedule-preprocess-rc52.js \
+            pdf-store-header-guard-rc57.js pdf-schedule-parser-rc57.js \
+            monitor-export.js divergence-dashboard-rc44.js divergence-capture-rc20.js divergence-help-rc42.js \
+            layout-fixes-rc19.js store-management.js ui-final-rc35.js network-led-panel-rc36.js \
+            competence-integrity-rc38.js region-view-integrity-rc38.js period-controller-rc39.js \
+            period-render-coherence-rc44.js evolution-dashboard-rc39.js regional-comparison-rc51.js \
+            performance-rc42.js divergence-audit-rc42.js recurrence-dashboard-rc44.js \
+            navigation-integrity-rc44.js rc50-integrity-check.js \
+            README.md LEIA-ME_LOCAL.txt RELEASE_MANIFEST.md \
+            "$ROOT/"
+          printf 'RC58\ncommit=%s\nworkflow_run=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$ROOT/BUILD_INFO.txt"
+          (cd dist && zip -r -9 ADERENCIA_ESCALA_RC58_TESTE_WINDOWS.zip ADERENCIA_ESCALA_RC58)
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ success() }}
+        with:
+          name: aderencia-escala-rc58-windows
+          path: dist/ADERENCIA_ESCALA_RC58_TESTE_WINDOWS.zip
+          retention-days: 14
+
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
