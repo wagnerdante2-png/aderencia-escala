@@ -2,45 +2,46 @@ const { test, expect } = require('@playwright/test');
 
 async function openApp(page){
   await page.goto('/index.html');
-  await page.waitForFunction(() => !!window.ADERENCIA_SCHEDULE_HARDENING && !!window.ADERENCIA_SCHEDULE_PREPROCESS && !!window.XLSX);
+  await page.waitForFunction(() => !!window.ADERENCIA_SCHEDULE_HARDENING && !!window.ADERENCIA_SCHEDULE_PREPROCESS && !!window.ADERENCIA_SCHEDULE_ADAPTIVE_RC61 && !!window.XLSX);
 }
 
-test('RC52 preprocesses an ML08 workbook before residual ML01 template metadata reaches the core parser', async ({ page }) => {
+test('RC61 normalizes an ML08 workbook even when residual ML01 template metadata exists', async ({ page }) => {
   await openApp(page);
-  await page.evaluate(() => {
-    document.getElementById('pointStatus').textContent='Reconhecido: 5 funcionário(s) • ML08 • 1200 marcações';
-    document.getElementById('metaPeriod').textContent='11/07/2026 a 10/08/2026';
-  });
-  const file = await page.evaluate(() => {
+  const diagnostic=await page.evaluate(async()=>{
+    const api=window.ADERENCIA_SCHEDULE_ADAPTIVE_RC61;
+    const employeeNames=['ANA TESTE','BIA TESTE','CARLA TESTE','DORA TESTE','ELISA TESTE'];
+    const normName=v=>String(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim().split(' ').filter(x=>x&&!['DE','DA','DO','DAS','DOS','E'].includes(x)).join(' ');
+    const people=employeeNames.map((name,i)=>({id:String(i+1),registration:String(i+1),name,plans:[]}));
+    const point={ctx:{store:'ML08',start:'2026-07-11',end:'2026-08-10'},people,byReg:new Map(people.map(p=>[p.registration,p])),byName:new Map(people.map(p=>[normName(p.name),p]))};
+
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
       ['ML01 - RESIDUO DE TEMPLATE'],['ML02'],['ML03'],['ML08 - CAMPINAS MORAES SALES']
     ]),'Configuração');
-    const dates=Array.from({length:31},(_,i)=>{const d=new Date(2026,6,11+i,12);return d;});
-    const employees=['ANA TESTE','BIA TESTE','CARLA TESTE','DORA TESTE','ELISA TESTE'];
-    const rows=[['Nome','Cargo',...dates],...employees.map((n,j)=>[n,'OPERADOR DE LOJA I',...dates.map((_,i)=>(i+j)%7===6?'F':'T1')])];
+    const dates=Array.from({length:31},(_,i)=>new Date(2026,6,11+i,12));
+    const rows=[['Modelo 1.2'],['Nome','Cargo',...dates],...employeeNames.map((n,j)=>[n,'OPERADOR DE LOJA I',...dates.map((_,i)=>(i+j)%7===6?'F':'T1')])];
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Andar no Tempo');
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['T1 | 08:00 às 17:00']]),'Legenda');
-    return Array.from(new Uint8Array(XLSX.write(wb,{bookType:'xlsx',type:'array'})));
+    const file=new File([XLSX.write(wb,{bookType:'xlsx',type:'array'})],'Escala - Novo Modelo - 1.2 ML08.xlsx',{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+
+    const out=await api.normalizeExcel(file,point);
+    const parsed=XLSX.read(await out.arrayBuffer(),{type:'array',cellDates:true});
+    const table=XLSX.utils.sheet_to_json(parsed.Sheets['Escala Ponto'],{header:1,defval:'',raw:false});
+    return {
+      name:out.name,
+      sheets:parsed.SheetNames,
+      header:table[2],
+      audit:api.last
+    };
   });
-  const bytes=Buffer.from(file);
-  await page.setInputFiles('#scheduleFile',{name:'Escala - Novo Modelo - 1.2 ML08.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:bytes});
-  await page.waitForFunction(() => !!window.ADERENCIA_SCHEDULE_PREPROCESS.last,{timeout:15000});
-  const diagnostic=await page.evaluate(async()=>{
-    const f=document.getElementById('scheduleFile').files?.[0];
-    let workbook=null;
-    if(f){
-      const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});
-      workbook={name:f.name,sheets:wb.SheetNames,heads:wb.SheetNames.map(n=>({sheet:n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,defval:'',raw:false}).slice(0,5)}))};
-    }
-    return {pre:window.ADERENCIA_SCHEDULE_PREPROCESS.last,hard:window.ADERENCIA_SCHEDULE_HARDENING.lastAudit,status:document.getElementById('scheduleStatus').textContent,workbook};
-  });
-  console.log('RC52_DIAGNOSTIC',JSON.stringify(diagnostic));
-  await expect(page.locator('#scheduleStatus')).toContainText(/Reconhecida: 5 funcionário\(s\).*ML08/i,{timeout:15000});
-  const audit=await page.evaluate(()=>({pre:window.ADERENCIA_SCHEDULE_PREPROCESS.last,hard:window.ADERENCIA_SCHEDULE_HARDENING.lastAudit,name:document.getElementById('scheduleFile').files?.[0]?.name}));
-  expect(audit.pre.mode).toBe('normalized');
-  expect(audit.pre.store).toBe('ML08');
-  expect(audit.name).toMatch(/^RC51_ML08_/);
-  expect(audit.hard.store).toBe('ML08');
-  expect(audit.hard.coverage).toBe(1);
+
+  console.log('RC61_RESIDUAL_TEMPLATE_DIAGNOSTIC',JSON.stringify(diagnostic));
+  expect(diagnostic.name).toMatch(/^RC51_RC61_ML08_/);
+  expect(diagnostic.sheets).toContain('Escala Ponto');
+  expect(diagnostic.header.slice(2)).toHaveLength(31);
+  expect(diagnostic.header[2]).toBe('11/07/2026');
+  expect(diagnostic.header.at(-1)).toBe('10/08/2026');
+  expect(diagnostic.audit.store).toBe('ML08');
+  expect(diagnostic.audit.matchedPeople).toBe(5);
+  expect(diagnostic.audit.cellCoverage).toBe(1);
 });

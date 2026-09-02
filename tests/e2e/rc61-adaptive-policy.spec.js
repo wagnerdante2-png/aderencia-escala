@@ -90,7 +90,7 @@ test('RC61 PDF identity does not require a store header when population proves t
     return {people:out.people.length,dates:out.dates.length,first:out.dates[0],last:out.dates.at(-1),turn:out.turns.get('T6')};
   });
   expect(r.people).toBe(3);
-  expect(r.dates).toHaveLength(31);
+  expect(r.dates).toBe(31);
   expect(r.first).toBe('2026-07-11');
   expect(r.last).toBe('2026-08-10');
   expect(r.turn).toEqual({start:'13:00',end:'22:00'});
