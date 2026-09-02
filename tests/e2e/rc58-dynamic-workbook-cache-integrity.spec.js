@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 async function openApp(page){
   await page.goto('/index.html');
-  await page.waitForFunction(() => window.ADERENCIA_SCHEDULE_PREPROCESS?.dynamicVersion === 'RC58.5' && !!window.XLSX);
+  await page.waitForFunction(() => window.ADERENCIA_SCHEDULE_PREPROCESS?.dynamicVersion === 'RC58.6' && !!window.XLSX);
 }
 
 async function inspectDynamic(page,{savedStore='ML32',ctxStore='ML32',ctxStart='2026-06-11',ctxEnd='2026-07-10',dynamic=true}={}){
@@ -31,33 +31,44 @@ async function inspectDynamic(page,{savedStore='ML32',ctxStore='ML32',ctxStart='
   },{savedStore,ctxStore,ctxStart,ctxEnd,dynamic});
 }
 
-test('RC58 bloqueia XLSM dinâmico salvo para outra loja em vez de fabricar conciliação parcial', async ({ page }) => {
+test('RC58 bloqueia XLSM dinâmico salvo para outra loja', async ({ page }) => {
   await openApp(page);
   const r=await inspectDynamic(page,{savedStore:'ML32',ctxStore:'ML40'});
   expect(r.info.store).toBe('ML32');
   expect(r.error).toMatchObject({code:'ADERENCIA_DYNAMIC_WORKBOOK_STORE_MISMATCH',fatal:true});
   expect(r.error.message).toContain('ML32');
   expect(r.error.message).toContain('ML40');
-  expect(r.error.message).toContain('não recalcula');
 });
 
-test('RC58 bloqueia ciclo 11→10 quando o cache mensal termina em 01/07', async ({ page }) => {
+test('RC58 aplica proporcionalidade quando escala mensal não cobre todo o ciclo 11→10', async ({ page }) => {
   await openApp(page);
   const r=await inspectDynamic(page,{savedStore:'ML32',ctxStore:'ML32',ctxStart:'2026-06-11',ctxEnd:'2026-07-10'});
+  expect(r.error).toBeNull();
   expect(r.info.coverage).toMatchObject({start:'2026-06-01',end:'2026-07-01',dates:31});
-  expect(r.error).toMatchObject({code:'ADERENCIA_DYNAMIC_WORKBOOK_PERIOD_INCOMPLETE',fatal:true});
-  expect(r.error.message).toContain('2026-07-01');
-  expect(r.error.message).toContain('2026-07-10');
+  expect(r.projection.dynamic.compatibility).toMatchObject({
+    proportional:true,
+    periodVerified:true,
+    overlapStart:'2026-06-11',
+    overlapEnd:'2026-07-01',
+    pointStart:'2026-06-11',
+    pointEnd:'2026-07-10'
+  });
 });
 
-test('RC58 permite o modelo dinâmico quando loja e período estão integralmente materializados', async ({ page }) => {
+test('RC58 mantém cálculo integral quando o ciclo está contido na escala materializada', async ({ page }) => {
   await openApp(page);
   const r=await inspectDynamic(page,{savedStore:'ML32',ctxStore:'ML32',ctxStart:'2026-06-11',ctxEnd:'2026-06-30'});
   expect(r.error).toBeNull();
-  expect(r.projection.dynamic).toMatchObject({dynamic:true,store:'ML32',coverage:{start:'2026-06-01',end:'2026-07-01',dates:31}});
+  expect(r.projection.dynamic.compatibility).toMatchObject({proportional:false,overlapStart:'2026-06-11',overlapEnd:'2026-06-30'});
 });
 
-test('RC58 não aplica a trava de cache dinâmico a uma escala estática/exportada', async ({ page }) => {
+test('RC58 bloqueia somente quando não existe nenhum dia em comum', async ({ page }) => {
+  await openApp(page);
+  const r=await inspectDynamic(page,{savedStore:'ML32',ctxStore:'ML32',ctxStart:'2026-08-11',ctxEnd:'2026-09-10'});
+  expect(r.error).toMatchObject({code:'ADERENCIA_DYNAMIC_WORKBOOK_NO_PERIOD_OVERLAP',fatal:true});
+});
+
+test('RC58 não aplica trava de cache dinâmico a uma escala estática/exportada', async ({ page }) => {
   await openApp(page);
   const r=await inspectDynamic(page,{savedStore:'ML32',ctxStore:'ML40',dynamic:false});
   expect(r.info).toBeNull();
