@@ -1,12 +1,16 @@
-# Manifesto de Release — v1.0 RC61
+# Manifesto de Release — v1.0 RC62
 
-Este manifesto registra o runtime ativo, a política adaptativa de leitura de escala, os controles de segurança e os critérios de aceite da candidata operacional RC61 para uso local.
+Este manifesto registra o runtime ativo, as correções derivadas do teste operacional da RC61, os controles de segurança e os critérios de aceite da candidata operacional RC62 para uso local.
 
-## Objetivo da RC61
+## Objetivo da RC62
 
-A RC61 substitui o conjunto de pré-condições rígidas do arquivo original por um **front-door adaptativo**. A escala é classificada, conciliada com o espelho de ponto e convertida em uma grade canônica antes de chegar às camadas históricas do motor.
+A RC62 corrige três comportamentos observados em teste manual real:
 
-O objetivo é aceitar variações operacionais reais sem transformar tolerância em aceitação cega.
+1. PDFs de **Escala de Folgas** com matriz esparsa eram rejeitados como se a grade Nome × Dias não existisse;
+2. um PDF-imagem com orientação inadequada não tinha tentativa de OCR em rotações alternativas;
+3. uma escala reconhecida parcialmente podia chegar ao motor com baixa cobertura estrutural e ser bloqueada pelo gate de 95%, sem que a camada adaptativa tivesse recomposto os dias normais de trabalho disponíveis no quadro Horários do espelho.
+
+A solução não remove o gate estrutural. A RC62 corrige a interpretação da fonte e mantém a filosofia fail-closed.
 
 ## Runtime essencial
 
@@ -17,6 +21,8 @@ Arquivos base:
 - `dashboard.css`
 - `bootstrap.js`
 - `engine-v3.js`
+- `schedule-adaptive-rc62.js`
+- `schedule-adaptive-rc61.js`
 - `history.js`
 - `history-report.js`
 - `export-report.js`
@@ -26,162 +32,129 @@ Arquivos base:
 
 `window.ADERENCIA_ACTIVE_MODULES` é a fonte de verdade para os módulos carregados pelo bootstrap.
 
-## Front-door adaptativo
+## Arquitetura adaptativa RC62
 
-O módulo principal da rodada é:
+`schedule-adaptive-rc62.js` — runtime `RC62.0` — é carregado imediatamente antes de `schedule-adaptive-rc61.js`.
 
-- `schedule-adaptive-rc61.js` — runtime `RC61.1`
+A RC62 assume o front-door de PDFs. Para PDF textual denso, ela reutiliza o parser RC61 já certificado. Para PDF identificado explicitamente como Escala de Folgas, usa a política esparsa/híbrida da RC62. Para PDF sem camada textual suficiente, aciona OCR sob demanda e pode tentar orientações alternativas.
 
-Ele entra antes dos gates históricos e recebe o arquivo original de escala em XLSX, XLSM, XLS ou PDF.
+Excel/XLSM/XLS continua no front-door RC61/RC59, preservando as regressões anteriores.
 
-A saída normalizada é um workbook canônico com nome `RC51_RC61_<LOJA>_...xlsx`. Esse prefixo identifica uma grade interna já reconciliada e impede que ela seja reinterpretada como um arquivo original cru.
+A saída normalizada permanece uma grade XLSX canônica com prefixo `RC51_RC61_<LOJA>_...xlsx`, mantendo compatibilidade com as camadas históricas e com o motor atual.
 
-Os módulos históricos permanecem ativos para compatibilidade e defesa em profundidade, incluindo `schedule-hardening-rc51.js`, `schedule-monthly-bridge-rc53.js`, `schedule-provenance-guard-rc55.js`, `schedule-source-identity-guard-rc58.js`, `schedule-preprocess-rc52.js`, `pdf-store-header-guard-rc57.js` e `pdf-schedule-parser-rc57.js`.
+## Escala de Folgas esparsa
 
-## Regra canônica de competência
+A RC62 parte da semântica operacional de que uma **Escala de Folgas** pode materializar principalmente exceções e eventos, deixando dias normais de trabalho em branco.
 
-A competência é o mês/ano do **início do período integral do espelho de ponto**.
+A política é:
 
-- `11/06/2026 a 10/07/2026` = Junho/2026
-- `11/07/2026 a 10/08/2026` = Julho/2026
-- `11/12/2026 a 10/01/2027` = Dezembro/2026
+1. o modo só é habilitado com evidência explícita de "Escala de Folgas" no nome ou conteúdo;
+2. dias são identificados por calendário e coordenadas da grade;
+3. códigos explícitos são associados à posição real da célula, evitando deslocamento de folga para a data errada;
+4. linhas com baixa densidade de códigos continuam elegíveis quando Nome e Cargo são reconhecíveis;
+5. a população é conciliada com o espelho pelo mecanismo adaptativo já certificado;
+6. células vazias são preenchidas somente quando o quadro **Horários** daquele colaborador no próprio espelho fornece uma previsão segura;
+7. um horário que coincide com a legenda reutiliza o turno existente;
+8. um horário sem código equivalente pode receber `T80`–`T99` como código técnico interno, preservando exatamente entrada/saída previstas;
+9. código explícito de turno sem horário na legenda do próprio PDF continua bloqueado;
+10. nenhuma previsão é inventada e nenhum turno é copiado de outro colaborador.
 
-Essa referência é usada no salvamento do Histórico e propagada para as visualizações do ecossistema.
+`WCA` passa a ser reconhecido como cargo operacional válido para esse tipo de grade.
 
-## Política temporal RC61
+## Gate estrutural de 95%
 
-A grade canônica usa a **interseção de datas reais** entre a escala reconhecida e o período do espelho.
+A RC62 distingue duas ideias que não devem ser confundidas:
 
-Consequências:
+- **cobertura temporal:** quais datas da escala realmente cruzam o período do ponto;
+- **cobertura estrutural:** quanto das marcações dos colaboradores conciliados possui informação de escala utilizável.
 
-- uma escala 01→30/31 pode ser comparada proporcionalmente com um espelho 11→10;
-- a interseção pode atravessar mudança de mês/ano;
-- datas que não existem na escala não são inventadas;
-- a RC61 não exige um threshold fixo de 95% para PDF;
-- o aceite exige estrutura mínima reconhecível, população conciliável e legenda suficiente para os turnos efetivamente utilizados.
+Não existe uma exigência universal de 95% de cobertura temporal para aceitar um PDF. A análise pode ser proporcional à interseção real.
 
-## Política de população e identidade
+O motor, entretanto, mantém o gate de **95% de cobertura estrutural** após a reconciliação. Na Escala de Folgas, a RC62 primeiro recompõe com segurança os dias vazios pelo quadro Horários e só depois deixa o motor calcular essa cobertura. Se ainda permanecer abaixo de 95%, o resultado é bloqueado.
 
-A loja do espelho é a âncora da análise. A RC61 não exige que o nome do arquivo ou o cabeçalho da escala tragam a mesma identificação literal da loja.
+## PDF imagem e autorrotação de OCR
 
-A origem é validada principalmente pela conciliação entre a população da escala e a população do espelho:
+A camada textual é sempre tentada primeiro.
 
-1. matrícula é usada quando disponível;
-2. nome normalizado é usado como evidência direta;
-3. aproximação de nomes é usada somente dentro de limites conservadores;
-4. cada colaborador do ponto só pode ser consumido uma vez na conciliação;
-5. diferenças de quantidade por admissões/desligamentos são toleradas;
-6. população sem sobreposição mínima é bloqueada como origem incompatível.
+Quando ela não produz estrutura suficiente, a RC62 usa `ADERENCIA_ENSURE_OCR()` e tenta, quando necessário:
 
-A RC61 nunca cria colaboradores inexistentes para melhorar artificialmente a cobertura.
+- 0°;
+- 90°;
+- 270°;
+- 180°.
 
-## Turnos por versão
+A rotação ocorre na renderização do PDF antes do OCR; as coordenadas reconhecidas continuam sendo usadas para reconstrução da grade.
 
-Códigos de turno não possuem semântica global fixa.
+Condições semânticas conclusivas — período sem interseção, população incompatível e turno explícito sem legenda — interrompem a busca e permanecem fail-closed. OCR não é usado para contornar uma rejeição já comprovada.
 
-A RC61 lê a legenda do próprio arquivo/modelo. Assim, `T6` em uma versão pode representar `13:00–22:00` e em outra `10:00–19:00` sem conflito.
+## Diagnóstico de período
 
-Se um turno utilizado na grade não tiver horário resolvido na legenda daquela origem, a normalização é bloqueada.
+A RC62 tenta reconhecer o calendário da fonte antes de classificar uma falha como estrutural. Quando a escala e o espelho não se cruzam, o erro deve apresentar os intervalos reconhecidos, por exemplo:
 
-## Exceções diárias
+`período da escala (01/06/2026 a 30/06/2026) não cruza o espelho (11/07/2026 a 10/08/2026)`
 
-Previsões específicas encontradas no espelho são aplicadas à data correspondente. Uma exceção exata não é propagada automaticamente para os dias seguintes.
+Isso evita que um arquivo válido de outra competência seja confundido com uma grade ilegível.
 
-Quando uma célula Excel está vazia e existe previsão segura para colaborador/data no espelho, a RC61 pode materializar um código interno de turno para preservar o horário previsto na grade canônica.
+## Política RC61 preservada
 
-## Excel/XLSM/XLS
+Continuam válidos:
 
-A RC61:
+- competência ancorada no início do período integral do espelho;
+- escala 01→30/31 comparável proporcionalmente com espelho 11→10;
+- população variável por admissões/desligamentos;
+- conciliação por matrícula/nome;
+- turnos resolvidos pela legenda da própria versão;
+- exceção diária limitada à data correspondente;
+- preenchimento seguro de lacunas de Excel a partir do quadro Horários;
+- proveniência RC55 e identidade RC58;
+- invalidação do estado anterior ao processar nova escala.
 
-- não executa macros;
-- procura grades contendo Nome, Cargo, datas e códigos diários;
-- reconcilia colaboradores com o espelho;
-- detecta a versão/modelo quando há evidência textual;
-- extrai a legenda do próprio workbook;
-- escolhe candidatos pela combinação de população conciliada, período e materialidade;
-- tolera resíduos de template que não representam a população real da escala;
-- falha fechada quando não consegue formar uma grade utilizável.
-
-## PDF textual e PDF digitalizado
-
-A leitura textual é tentada primeiro. Quando ela é insuficiente, `ADERENCIA_ENSURE_OCR()` carrega Tesseract.js sob demanda.
-
-O parser RC61 exige:
-
-- calendário/dias reconhecíveis;
-- população/cargos reconhecíveis;
-- conciliação mínima com o espelho;
-- códigos de escala materializados;
-- horários para os turnos utilizados.
-
-Cabeçalho literal de loja não é obrigatório quando a população prova a origem. OCR não pode inventar população, datas ou turnos ausentes.
-
-## Segurança e proveniência
+## Segurança
 
 - PDF.js usa `isEvalSupported=false` e scripting desabilitado;
-- Tesseract não é carregado no startup;
-- grade sintética RC61 possui identificação própria;
-- o estado calculável anterior é invalidado enquanto uma nova escala é processada;
-- uma entrada não reconhecida deixa o cálculo desabilitado;
-- módulos de proveniência RC55 permanecem ativos para impedir relabeling de artefatos internos;
-- parsers históricos não devem reassumir o arquivo original quando o front-door RC61 está processando a entrada.
+- Tesseract.js 5.x permanece lazy e não é carregado no startup;
+- o modo híbrido não é ativado em PDF comum sem evidência explícita de Escala de Folgas;
+- população incompatível não é aceita para aumentar cobertura;
+- turnos explícitos sem legenda não recebem horário inventado;
+- período sem interseção é bloqueado;
+- o gate estrutural de 95% permanece ativo;
+- artefatos sintéticos continuam identificados para impedir relabeling de origem.
 
-## Persistência e dashboards
-
-- `localStorage` funciona como cache/contingência local;
-- a base portátil `aderencia-dados.json` pode ser criada/vinculada;
-- histórico, divergências, configuração administrativa e cadastro de lojas/regionais acompanham a base portátil;
-- a competência global sincroniza LED da rede, Histórico, Monitoramento, Divergências, Evolução e ano do Semestral;
-- reprocessar a mesma loja/competência substitui o registro correspondente em vez de duplicá-lo.
-
-## Dependências externas
-
-Startup:
-
-- PDF.js 3.11.174
-- SheetJS/XLSX 0.18.5
-- jsPDF 2.5.1
-
-Sob demanda:
-
-- Tesseract.js 5.x
-
-É necessária conexão para dependências CDN que ainda não estejam disponíveis no navegador.
-
-## Health check
+## Health check RC62
 
 Por compatibilidade histórica, o objeto consolidado continua se chamando `ADERENCIA_RC50_HEALTH`.
 
-Na RC61 certificada:
+A candidata RC62 exige:
 
-`ADERENCIA_VERSION === 'v1.0 RC61'`
+`ADERENCIA_VERSION === 'v1.0 RC62'`
 
-`ADERENCIA_SCHEDULE_ADAPTIVE_RC61.version` começa com `RC61`
+`ADERENCIA_SCHEDULE_ADAPTIVE_RC62.version` começa com `RC62`
+
+`ADERENCIA_SCHEDULE_ADAPTIVE_RC61.version` continua começando com `RC61`
 
 `ADERENCIA_RC50_HEALTH.ok === true`
 
-## Testes de aceite RC61
+## Testes de aceite adicionais RC62
 
-1. Abrir `index.html` sem erro global não tratado.
-2. Confirmar versão global `v1.0 RC61` e health check verde.
-3. Confirmar que Tesseract não é carregado no startup.
-4. Confirmar que escala 01→30 pode gerar somente a interseção 11→30 contra espelho 11→10 do mês seguinte.
-5. Confirmar calendário 11→10 atravessando mês corretamente.
-6. Confirmar que população 55×60 pode ser aceita quando 55 pessoas são conciliadas.
-7. Confirmar que uma população sem correspondência é rejeitada.
-8. Confirmar que o mesmo código de turno pode ter horários diferentes em versões diferentes.
-9. Confirmar que exceção diária vale somente para a data exata.
-10. Confirmar PDF sem cabeçalho literal de loja quando a população comprova a origem.
-11. Confirmar que arquivo estruturalmente inválido falha fechado, sem fallback inseguro.
-12. Confirmar que o front-door RC61 possui o evento do arquivo original antes do fallback transacional RC58.
-13. Preservar regressões históricas de navegação, competência, histórico, divergências, recorrência, regional, persistência, lote e exportações.
-14. Toda a suíte Playwright precisa concluir com sucesso.
-15. O pacote Windows só pode ser construído e publicado depois dos testes E2E verdes.
+Além de toda a suíte histórica:
+
+1. reconhecer uma Escala de Folgas de 31 dias com poucos códigos explícitos por colaborador;
+2. manter cada `F`/evento na data determinada pela coordenada original;
+3. preencher dias vazios somente a partir do plano do próprio colaborador no espelho;
+4. atingir cobertura completa em cenário sintético quando o espelho fornece plano suficiente;
+5. reconhecer `WCA` como cargo válido nessa estrutura;
+6. não habilitar modo esparso para PDF operacional comum sem evidência de Escala de Folgas;
+7. diagnosticar período sem interseção com os dois intervalos;
+8. manter Tesseract fora do startup;
+9. manter todas as regressões RC51–RC61 verdes;
+10. construir o pacote Windows somente depois de toda a suíte Playwright verde.
 
 ## Certificação e pacote
 
-A identificação exata do commit e da execução do workflow que geraram cada pacote fica registrada em `BUILD_INFO.txt` dentro do ZIP. O artefato final deve ser validado por integridade ZIP antes de distribuição.
+A identificação exata do commit e da execução que geraram o pacote fica em `BUILD_INFO.txt` dentro do ZIP. O workflow final produz `ADERENCIA_ESCALA_RC62_TESTE_WINDOWS.zip` e o artefato `aderencia-escala-rc62-windows`.
+
+O ZIP deve ser validado por integridade, referências locais e coerência de versão antes de ser distribuído para novo teste manual.
 
 ## Congelamento da rodada
 
-A RC61 é a candidata corrente para teste prático. Novas correções funcionais posteriores devem abrir uma rodada identificável, preservando este marco no histórico de commits e Actions.
+A RC62 é a candidata criada especificamente a partir das falhas observadas no teste manual da RC61. Novas correções posteriores devem abrir uma nova rodada identificável, preservando RC61 e RC62 no histórico de commits e Actions.
