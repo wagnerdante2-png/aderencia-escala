@@ -4,7 +4,7 @@ if(window.__ADERENCIA_SCHEDULE_PREPROCESS_RC52__)return;
 window.__ADERENCIA_SCHEDULE_PREPROCESS_RC52__=true;
 const input=document.getElementById('scheduleFile'),status=document.getElementById('scheduleStatus');
 if(!input)return;
-const VERSION='RC52.5',PROJECTION_VERSION='RC58.4',DYNAMIC_VERSION='RC58.5';
+const VERSION='RC52.5',PROJECTION_VERSION='RC58.4',DYNAMIC_VERSION='RC58.6';
 let busy=false,passing=false;
 const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 function excel(file){
@@ -66,14 +66,12 @@ function dynamicFatal(code,message,info,ctx,source){
 function assertDynamicWorkbookCompatible(wb,ctx,source=''){
  const info=dynamicWorkbookInfo(wb);if(!info||!ctx)return info;
  if(info.stores.length>1)throw dynamicFatal('ADERENCIA_DYNAMIC_WORKBOOK_CACHE_AMBIGUOUS',`RC58: o XLSM dinâmico possui cache de lojas divergentes (${info.stores.join(', ')}). O navegador não recalcula este modelo com segurança; salve/recalcule o arquivo no Excel para uma única loja antes da análise.`,info,ctx,source);
- if(!info.store)throw dynamicFatal('ADERENCIA_DYNAMIC_WORKBOOK_CACHE_UNVERIFIED','RC58: este XLSM é um modelo dinâmico, mas a loja materializada no cache não pôde ser confirmada. O cálculo foi bloqueado para não produzir uma conciliação parcial enganosa.',info,ctx,source);
- if(info.store!==ctx.store)throw dynamicFatal('ADERENCIA_DYNAMIC_WORKBOOK_STORE_MISMATCH',`RC58: este XLSM está salvo/calculado para ${info.store}, mas o espelho é ${ctx.store}. O navegador não recalcula as fórmulas do modelo para outra loja; usar este cache geraria uma análise parcial incorreta. Recalcule e salve o XLSM em ${ctx.store}, ou use uma escala exportada dessa loja.`,info,ctx,source);
- if(!info.coverage)throw dynamicFatal('ADERENCIA_DYNAMIC_WORKBOOK_PERIOD_UNVERIFIED',`RC58: o XLSM dinâmico de ${info.store} não possui um intervalo mensal materializado que possa ser validado. O cálculo foi bloqueado para não inferir dias inexistentes.`,info,ctx,source);
- if(ctx.start<info.coverage.start||ctx.end>info.coverage.end){
-   const missingStart=ctx.start<info.coverage.start?ctx.start:null,missingEnd=ctx.end>info.coverage.end?ctx.end:null;
-   const gap=missingEnd?`${info.coverage.end} → ${missingEnd}`:(missingStart?`${missingStart} → ${info.coverage.start}`:'fora do cache');
-   throw dynamicFatal('ADERENCIA_DYNAMIC_WORKBOOK_PERIOD_INCOMPLETE',`RC58: o XLSM de ${info.store} está materializado somente de ${info.coverage.start} a ${info.coverage.end}, mas o espelho exige ${ctx.start} a ${ctx.end}. Falta cobertura (${gap}); o navegador não recalcula a timeline deste modelo. Recalcule/salve o período necessário no Excel ou use uma escala exportada cobrindo todo o ciclo.`,info,ctx,source);
- }
+ if(!info.store)throw dynamicFatal('ADERENCIA_DYNAMIC_WORKBOOK_CACHE_UNVERIFIED','RC58: este XLSM é um modelo dinâmico, mas a loja materializada no cache não pôde ser confirmada. O cálculo foi bloqueado para não misturar lojas.',info,ctx,source);
+ if(info.store!==ctx.store)throw dynamicFatal('ADERENCIA_DYNAMIC_WORKBOOK_STORE_MISMATCH',`RC58: este XLSM está salvo/calculado para ${info.store}, mas o espelho é ${ctx.store}. O navegador não recalcula as fórmulas do modelo para outra loja; use a escala materializada de ${ctx.store}.`,info,ctx,source);
+ if(!info.coverage){info.compatibility={proportional:null,periodVerified:false,overlapStart:null,overlapEnd:null};return info}
+ const overlapStart=ctx.start>info.coverage.start?ctx.start:info.coverage.start,overlapEnd=ctx.end<info.coverage.end?ctx.end:info.coverage.end;
+ if(overlapStart>overlapEnd)throw dynamicFatal('ADERENCIA_DYNAMIC_WORKBOOK_NO_PERIOD_OVERLAP',`RC58: a escala de ${info.store} cobre ${info.coverage.start} a ${info.coverage.end}, mas o espelho cobre ${ctx.start} a ${ctx.end}; não existe nenhum dia em comum para cálculo proporcional.`,info,ctx,source);
+ info.compatibility={periodVerified:true,proportional:ctx.start<info.coverage.start||ctx.end>info.coverage.end,overlapStart,overlapEnd,sourceStart:info.coverage.start,sourceEnd:info.coverage.end,pointStart:ctx.start,pointEnd:ctx.end};
  return info;
 }
 async function projectLargeWorkbook(file,ctx=null){
@@ -94,12 +92,12 @@ window.addEventListener('change',ev=>{
  const x=context();if(!x){window.ADERENCIA_SCHEDULE_PREPROCESS.last={mode:'bypass',reason:'no-validated-point-context',source:file.name,at:new Date().toISOString()};return}
  ev.preventDefault();ev.stopImmediatePropagation();busy=true;
  const {h,c:ctx}=x;
- if(status){status.textContent='RC58: validando loja, período e abas operacionais da escala...';status.className='status error'}
+ if(status){status.textContent='RC58: validando loja e preparando abas operacionais da escala...';status.className='status error'}
  let prepared=file,projection=null;
  Promise.resolve(projectLargeWorkbook(file,ctx)).then(p=>{
    projection=p;prepared=p.file;
    window.ADERENCIA_SCHEDULE_PREPROCESS.lastProjection={version:PROJECTION_VERSION,dynamicVersion:DYNAMIC_VERSION,source:file.name,projected:p.projected,target:prepared.name,dynamic:p.dynamic||null,selectedSheets:p.selectedSheets||null,excludedSheets:p.excludedSheets||null,metrics:p.metrics,at:new Date().toISOString()};
-   if(status){status.textContent=p.projected?'RC58: abas operacionais isoladas; conciliando escala...':'RC58: conciliando escala com colaboradores e dias reconhecidos no espelho...';status.className='status error'}
+   if(status){const proportional=p.dynamic?.compatibility?.proportional===true;status.textContent=proportional?`RC58: escala parcial válida (${p.dynamic.compatibility.overlapStart} a ${p.dynamic.compatibility.overlapEnd}); aplicando proporcionalidade...`:(p.projected?'RC58: abas operacionais isoladas; conciliando escala...':'RC58: conciliando escala com colaboradores e dias reconhecidos no espelho...');status.className='status error'}
    return h.normalizeExcel(prepared,ctx);
  }).then(normalized=>{
    window.ADERENCIA_SCHEDULE_PREPROCESS.last={mode:'normalized',source:file.name,prepared:prepared.name,target:normalized.name,projected:!!projection?.projected,dynamic:projection?.dynamic||null,store:ctx.store,start:ctx.start,end:ctx.end,at:new Date().toISOString()};
