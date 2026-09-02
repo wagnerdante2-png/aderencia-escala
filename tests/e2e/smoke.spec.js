@@ -20,15 +20,17 @@ test('startup has no uncaught errors and RC50 integrity is green', async ({ page
     runtime: window.ADERENCIA_RUNTIME_CACHE,
     pdfFlag: window.__ADERENCIA_PDF_HARDENED__,
     pdf: window.ADERENCIA_PDF_SECURITY,
-    pdfStoreGuard: window.ADERENCIA_PDF_STORE_GUARD_RC56?.version,
+    pdfStoreGuard: window.ADERENCIA_PDF_STORE_GUARD_RC57?.version,
+    pdfOcr: window.ADERENCIA_PDF_OCR_RC57?.version,
     version: window.ADERENCIA_VERSION
   }));
   console.log('RC50_PAGE_ERRORS', JSON.stringify(errors));
   console.log('RC50_RUNTIME_DIAG', JSON.stringify({runtimeFlag:health.runtimeFlag,runtime:!!health.runtime,pdfFlag:health.pdfFlag,pdf:health.pdf||null}));
   console.log('RC50_FAILED_CHECKS', JSON.stringify(health.failed));
   expect(errors, 'Uncaught browser errors').toEqual([]);
-  expect(health.version).toBe('v1.0 RC56');
-  expect(health.pdfStoreGuard).toBe('RC56.1');
+  expect(health.version).toBe('v1.0 RC57');
+  expect(health.pdfStoreGuard).toBe('RC57.1');
+  expect(health.pdfOcr).toBe('RC57.1');
   expect(health.core?.ok).toBeTruthy();
   expect(health.final?.ok, JSON.stringify(health.failed)).toBeTruthy();
   expect(health.pdf).toMatchObject({ active:true, isEvalSupported:false, enableScripting:false });
