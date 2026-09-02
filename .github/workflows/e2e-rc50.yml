@@ -1,4 +1,4 @@
-name: RC59 End-to-End
+name: RC61 Adaptive End-to-End
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,19 +21,19 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e:chromium
 
-      - name: Build RC59 Windows test package
+      - name: Build RC61 Windows test package
         if: ${{ success() }}
         shell: bash
         run: |
           set -euo pipefail
-          ROOT="dist/ADERENCIA_ESCALA_RC59"
+          ROOT="dist/ADERENCIA_ESCALA_RC61"
           mkdir -p "$ROOT"
           cp \
             index.html styles.css dashboard.css \
             bootstrap.js engine-v3.js history.js history-report.js export-report.js batch.js \
             runtime-cache-rc47.js ocr-lazy-rc48.js portable-storage.js pdf-security-rc35.js point-semantics.js \
             pdf-xlsx-compat-rc21.js pdf-calendar-integrity-rc29.js canonical-validation-rc35.js \
-            schedule-hardening-rc51.js schedule-monthly-bridge-rc53.js schedule-rc59-compat-capture.js schedule-real-xlsm-rc59.js schedule-rc59-compat-guard.js schedule-rc59-point-table-guard.js schedule-provenance-guard-rc55.js \
+            schedule-hardening-rc51.js schedule-adaptive-rc61.js schedule-monthly-bridge-rc53.js schedule-rc59-compat-capture.js schedule-real-xlsm-rc59.js schedule-rc59-compat-guard.js schedule-rc59-point-table-guard.js schedule-provenance-guard-rc55.js \
             schedule-source-identity-guard-rc58.js schedule-preprocess-rc52.js \
             pdf-store-header-guard-rc57.js pdf-schedule-parser-rc57.js \
             monitor-export.js divergence-dashboard-rc44.js divergence-capture-rc20.js divergence-help-rc42.js \
@@ -44,19 +44,19 @@ jobs:
             navigation-integrity-rc44.js rc50-integrity-check.js \
             README.md LEIA-ME_LOCAL.txt RELEASE_MANIFEST.md \
             "$ROOT/"
-          printf 'RC59\ncompat=RC59.4\ncommit=%s\nworkflow_run=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$ROOT/BUILD_INFO.txt"
-          (cd dist && zip -r -9 ADERENCIA_ESCALA_RC59_TESTE_WINDOWS.zip ADERENCIA_ESCALA_RC59)
+          printf 'RC61\nadaptive=RC61.1\ncommit=%s\nworkflow_run=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$ROOT/BUILD_INFO.txt"
+          (cd dist && zip -r -9 ADERENCIA_ESCALA_RC61_TESTE_WINDOWS.zip ADERENCIA_ESCALA_RC61)
 
       - uses: actions/upload-artifact@v4
         if: ${{ success() }}
         with:
-          name: aderencia-escala-rc59-windows
-          path: dist/ADERENCIA_ESCALA_RC59_TESTE_WINDOWS.zip
+          name: aderencia-escala-rc61-windows
+          path: dist/ADERENCIA_ESCALA_RC61_TESTE_WINDOWS.zip
           retention-days: 14
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report-rc59
+          name: playwright-report-rc61
           path: playwright-report/
           retention-days: 14
