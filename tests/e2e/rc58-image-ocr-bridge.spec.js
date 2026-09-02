@@ -2,18 +2,42 @@ const { test, expect } = require('@playwright/test');
 
 async function openApp(page){
   await page.goto('/index.html');
-  await page.waitForFunction(() => window.ADERENCIA_PDF_IMAGE_OCR_RC58?.version === 'RC58.7' && !!window.XLSX && !!window.pdfjsLib);
+  await page.waitForFunction(() => window.ADERENCIA_PDF_IMAGE_OCR_RC58?.version === 'RC58.7' && window.ADERENCIA_OCR_GRID_NORMALIZER_RC58?.version === 'RC58.7' && !!window.XLSX && !!window.pdfjsLib);
 }
 
-test('RC58 carrega ponte OCR antes do parser PDF textual', async ({ page }) => {
+test('RC58 carrega normalizador e ponte OCR antes do parser PDF textual', async ({ page }) => {
   await openApp(page);
   const state=await page.evaluate(() => {
     const a=window.ADERENCIA_ACTIVE_MODULES||[];
-    return {ocr:a.indexOf('pdf-image-ocr-bridge-rc58.js'),pdf:a.indexOf('pdf-schedule-parser-rc58.js'),version:window.ADERENCIA_PDF_IMAGE_OCR_RC58.version};
+    return {
+      normalizer:a.indexOf('ocr-grid-normalizer-rc58.js'),
+      ocr:a.indexOf('pdf-image-ocr-bridge-rc58.js'),
+      pdf:a.indexOf('pdf-schedule-parser-rc58.js'),
+      version:window.ADERENCIA_PDF_IMAGE_OCR_RC58.version,
+      normalizerVersion:window.ADERENCIA_OCR_GRID_NORMALIZER_RC58.version
+    };
   });
   expect(state.version).toBe('RC58.7');
-  expect(state.ocr).toBeGreaterThan(-1);
+  expect(state.normalizerVersion).toBe('RC58.7');
+  expect(state.normalizer).toBeGreaterThan(-1);
+  expect(state.ocr).toBeGreaterThan(state.normalizer);
   expect(state.pdf).toBeGreaterThan(state.ocr);
+});
+
+test('RC58 normaliza somente confusões típicas de códigos de turno no OCR', async ({ page }) => {
+  await openApp(page);
+  const result=await page.evaluate(() => {
+    const n=window.ADERENCIA_OCR_GRID_NORMALIZER_RC58.normalizeToken;
+    return {
+      n113:n('113'),n118:n('118'),n128:n('128'),ta3:n('Ta3'),t1e:n('T1e'),
+      name:n('FILIPE'),date:n('30'),time:n('17:00'),plain:n('OPERADOR')
+    };
+  });
+  expect(result).toMatchObject({n113:'T13',n118:'T18',n128:'T28',ta3:'T13',t1e:'T18'});
+  expect(result.name).toBe('FILIPE');
+  expect(result.date).toBe('30');
+  expect(result.time).toBe('17:00');
+  expect(result.plain).toBe('OPERADOR');
 });
 
 test('RC58 identifica PDF sem camada textual como candidato a OCR', async ({ page }) => {
