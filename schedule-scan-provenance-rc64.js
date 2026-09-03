@@ -12,10 +12,10 @@ function mark(file){
  if(!file||!last||last.source!=='pdf-scan-grid'||!/\.xlsx$/i.test(file.name))return false;
  if(file.name!==expectedName(last))return false;
  const coverage=Number(last.coverage),safe=safeProfile(last),controlled=last.coveragePolicy==='partial-controlled'&&safe&&coverage>=.92&&coverage<.95;
- const meta=Object.freeze({version:VERSION,source:'pdf-ocr-controlled',scannerVersion:last.version||scanner?.version||'RC63',original:String(last.original||''),store:String(last.store||''),coverage,controlled,structuralCoverageFloor:controlled?.92:.95,distributionSafe:safe,identityRatio:Number(last.coverageProfile?.identityRatio),blankRows:Number(last.coverageProfile?.blankRows),blankCols:Number(last.coverageProfile?.blankCols),maxRowMissing:Number(last.coverageProfile?.maxRowMissing),maxColMissing:Number(last.coverageProfile?.maxColMissing),maxRun:Number(last.coverageProfile?.maxRun)});
+ const meta=Object.freeze({version:VERSION,source:'pdf-ocr-controlled',scannerVersion:last.version||scanner?.version||'RC63',original:String(last.original||''),store:String(last.store||''),coverage,controlled,structuralCoverageFloor:controlled ? .92 : .95,distributionSafe:safe,identityRatio:Number(last.coverageProfile?.identityRatio),blankRows:Number(last.coverageProfile?.blankRows),blankCols:Number(last.coverageProfile?.blankCols),maxRowMissing:Number(last.coverageProfile?.maxRowMissing),maxColMissing:Number(last.coverageProfile?.maxColMissing),maxRun:Number(last.coverageProfile?.maxRun)});
  try{Object.defineProperty(file,'__ADERENCIA_CONTROLLED_SCAN__',{value:meta,enumerable:false,configurable:false,writable:false});return true}catch{return false}
 }
-function metaFor(file){return file?.__ADERENCIA_CONTROLLED_SCAN__||null}
+function metaFor(file){if(file?.__ADERENCIA_CONTROLLED_SCAN__)return file.__ADERENCIA_CONTROLLED_SCAN__;return mark(file)?file.__ADERENCIA_CONTROLLED_SCAN__:null}
 input?.addEventListener('change',e=>{if(e.target===input)mark(input.files?.[0])},true);
 window.ADERENCIA_SCAN_PROVENANCE_RC64={version:VERSION,mark,metaFor,expectedName,safeProfile};
 })();
