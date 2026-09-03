@@ -34,7 +34,7 @@ jobs:
               s=s.replace(old,new,count)
 
           helpers="""function sourceLabel(source){return source==='pdf-ocr-controlled'?'PDF digitalizado + OCR':source==='excel'?'Excel/XLSM':source==='pdf-ocr'?'PDF + OCR':'PDF com texto'}
-          function workbookScanMeta(wb){for(const n of wb?.SheetNames||[]){const rows=safeRows(wb.Sheets[n],14,24,false);for(const row of rows){if(norm(cellText(row?.[0]))!=='RC63 META')continue;const raw={};for(const v of row.slice(1)){const s=cellText(v),p=s.indexOf('=');if(p>0)raw[s.slice(0,p).trim()]=s.slice(p+1).trim()}return{scan:raw.scan==='1',controlled:raw.controlled==='1',coverage:Number(raw.coverage),identityRatio:Number(raw.identity),maxRowMissing:Number(raw.maxRowMissing),maxColMissing:Number(raw.maxColMissing),maxRun:Number(raw.maxRun)}}return null}
+          function workbookScanMeta(wb){for(const n of wb?.SheetNames||[]){const rows=safeRows(wb.Sheets[n],14,24,false);for(const row of rows){if(norm(cellText(row?.[0]))!=='RC63 META')continue;const raw={};for(const v of row.slice(1)){const s=cellText(v),p=s.indexOf('=');if(p>0)raw[s.slice(0,p).trim()]=s.slice(p+1).trim()}return{scan:raw.scan==='1',controlled:raw.controlled==='1',coverage:Number(raw.coverage),identityRatio:Number(raw.identity),maxRowMissing:Number(raw.maxRowMissing),maxColMissing:Number(raw.maxColMissing),maxRun:Number(raw.maxRun)}}}return null}
           function closeEnough(a,b,t=0.002){return Number.isFinite(+a)&&Number.isFinite(+b)&&Math.abs(+a-+b)<=t}
           function verifyScanBridge(wb,runtime){const meta=workbookScanMeta(wb);if(!meta?.scan||runtime?.source!=='pdf-ocr-controlled'||runtime?.distributionSafe!==true)return null;if(+runtime.blankRows!==0||+runtime.blankCols!==0||+runtime.identityRatio<0.60||+runtime.maxRowMissing>0.50||+runtime.maxColMissing>0.50||+runtime.maxRun>7)return null;if(!closeEnough(meta.coverage,runtime.coverage)||!closeEnough(meta.identityRatio,runtime.identityRatio,0.015)||!closeEnough(meta.maxRowMissing,runtime.maxRowMissing,0.01)||!closeEnough(meta.maxColMissing,runtime.maxColMissing,0.01)||+meta.maxRun!==+runtime.maxRun)return null;const controlled=runtime.controlled===true&&meta.controlled===true&&meta.coverage>=0.92&&meta.coverage<0.95;return{meta,controlled,structuralCoverageFloor:controlled ? 0.92 : 0.95}}
           function coverageFloor(schedule){const controlled=schedule?.source==='pdf-ocr-controlled'&&schedule?.controlledScan===true&&schedule?.scanMeta?.controlled===true&&schedule?.structuralCoverageFloor===0.92;return controlled ? 0.92 : 0.95}
@@ -56,6 +56,7 @@ jobs:
           rep("enable();\n})();", "window.ADERENCIA_ENGINE_RC64={version:'RC64.1',parseScheduleWorkbook,workbookScanMeta,verifyScanBridge,sourceLabel,coverageFloor,coverageGate};\nenable();\n})();")
           Path('engine-v3.js').write_text(s,encoding='utf-8')
           PY
+          node --check /tmp/engine-rc63.js
           node --check engine-v3.js
           if ! git diff --quiet -- engine-v3.js; then
             git config user.name "github-actions[bot]"
