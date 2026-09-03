@@ -94,3 +94,7 @@ A suíte RC64 adiciona regressões para:
 O workflow passa a produzir `ADERENCIA_ESCALA_RC64_TESTE_WINDOWS.zip` e registra no `BUILD_INFO.txt` as versões do engine, scanner, bridge de proveniência, visão mensal, tratativas e relatório.
 
 O pacote permanece uma aplicação web local completa, iniciada por `index.html`.
+
+## 6. Candidata de validação
+
+A candidata RC64 foi consolidada após a reconstrução controlada de `engine-v3.js` sobre a base RC63.3 validada, preservando o gate global de 95% e isolando o piso de 92% à proveniência de grade digitalizada aprovada. Este registro dispara a validação final e o empacotamento íntegro da candidata.
