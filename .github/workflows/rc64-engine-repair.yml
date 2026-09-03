@@ -1,0 +1,46 @@
+name: RC64 Engine Syntax Repair
+
+on:
+  push:
+    branches: [rc63-operational-controls-scan]
+    paths:
+      - .github/workflows/rc64-engine-repair.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rc63-operational-controls-scan
+      - name: Repair RC64 coverage ternaries and validate engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('engine-v3.js')
+          s=p.read_text(encoding='utf-8')
+          old1="structuralCoverageFloor:controlled?.92:.95"
+          new1="structuralCoverageFloor:controlled ? .92 : .95"
+          old2="function coverageFloor(schedule){return schedule?.source==='pdf-ocr-controlled'&&schedule?.controlledScan===true&&schedule?.scanMeta?.controlled===true&&schedule?.structuralCoverageFloor===.92?.92:.95}"
+          new2="function coverageFloor(schedule){const controlled=schedule?.source==='pdf-ocr-controlled'&&schedule?.controlledScan===true&&schedule?.scanMeta?.controlled===true&&schedule?.structuralCoverageFloor===.92;return controlled ? .92 : .95}"
+          if old1 not in s: raise SystemExit('expected controlled floor ternary not found')
+          if old2 not in s: raise SystemExit('expected coverageFloor expression not found')
+          s=s.replace(old1,new1,1).replace(old2,new2,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+          node --check engine-v3.js
+      - name: Commit repaired engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add engine-v3.js
+          git commit -m "RC64: repair engine controlled coverage syntax"
+          git push origin HEAD:rc63-operational-controls-scan
