@@ -33,7 +33,7 @@ jobs:
             bootstrap.js engine-v3.js history.js history-report.js export-report.js batch.js \
             runtime-cache-rc47.js ocr-lazy-rc48.js portable-storage.js pdf-security-rc35.js point-semantics.js \
             pdf-xlsx-compat-rc21.js pdf-calendar-integrity-rc29.js canonical-validation-rc35.js \
-            schedule-hardening-rc51.js schedule-adaptive-rc62.js schedule-adaptive-rc61.js schedule-monthly-bridge-rc53.js schedule-rc59-compat-capture.js schedule-real-xlsm-rc59.js schedule-rc59-compat-guard.js schedule-rc59-point-table-guard.js schedule-provenance-guard-rc55.js \
+            schedule-hardening-rc51.js schedule-adaptive-rc62.js schedule-adaptive-rc61.js schedule-ocr-identity-rc62.js schedule-monthly-bridge-rc53.js schedule-rc59-compat-capture.js schedule-real-xlsm-rc59.js schedule-rc59-compat-guard.js schedule-rc59-point-table-guard.js schedule-provenance-guard-rc55.js \
             schedule-source-identity-guard-rc58.js schedule-preprocess-rc52.js \
             pdf-store-header-guard-rc57.js pdf-schedule-parser-rc57.js \
             monitor-export.js divergence-dashboard-rc44.js divergence-capture-rc20.js divergence-help-rc42.js \
@@ -44,7 +44,7 @@ jobs:
             navigation-integrity-rc44.js rc50-integrity-check.js \
             README.md LEIA-ME_LOCAL.txt RELEASE_MANIFEST.md \
             "$ROOT/"
-          printf 'RC62\nadaptive=RC61.1\nrc62_adapter=RC62.1\ncommit=%s\nworkflow_run=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$ROOT/BUILD_INFO.txt"
+          printf 'RC62\nadaptive=RC61.1\nrc62_adapter=RC62.1\nocr_identity=RC62.1\ncommit=%s\nworkflow_run=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$ROOT/BUILD_INFO.txt"
           (cd dist && zip -r -9 ADERENCIA_ESCALA_RC62_TESTE_WINDOWS.zip ADERENCIA_ESCALA_RC62)
 
       - uses: actions/upload-artifact@v4
