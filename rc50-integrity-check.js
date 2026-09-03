@@ -2,7 +2,7 @@
 'use strict';
 function run(){
  const checks=[];const add=(name,ok,detail='')=>checks.push({name,ok:!!ok,detail});
- add('version',/^v1\.0 RC(?:5[1-9]|6[0-2])$/.test(window.ADERENCIA_VERSION||''),window.ADERENCIA_VERSION||'ausente');
+ add('version',/^v1\.0 RC(?:5[1-9]|6[0-3])$/.test(window.ADERENCIA_VERSION||''),window.ADERENCIA_VERSION||'ausente');
  const active=window.ADERENCIA_ACTIVE_MODULES||[];
  add('active-modules',Array.isArray(active)&&active.length>10,`${active.length} módulos`);
  add('no-duplicate-modules',new Set(active).size===active.length);
@@ -21,6 +21,9 @@ function run(){
  add('divergence-dashboard',!!window.ADERENCIA_DIVERGENCE_DASHBOARD);
  add('divergence-capture',!!window.__ADERENCIA_DIVERGENCE_CAPTURE_RC20__);
  add('schedule-hardening',/^RC51(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_HARDENING?.version||''),window.ADERENCIA_SCHEDULE_HARDENING?.version||'ausente');
+ add('schedule-scan-grid-rc63',/^RC63(?:\.|$)/.test(window.ADERENCIA_SCAN_GRID_RC63?.version||''),window.ADERENCIA_SCAN_GRID_RC63?.version||'ausente');
+ add('operational-flags-rc63',/^RC63(?:\.|$)/.test(window.ADERENCIA_OPERATIONAL_FLAGS?.version||''),window.ADERENCIA_OPERATIONAL_FLAGS?.version||'ausente');
+ add('ml04-permanent-inactive',window.ADERENCIA_OPERATIONAL_FLAGS?.isInactive?.('ML04')===true);
  add('schedule-adaptive-rc62',/^RC62(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_ADAPTIVE_RC62?.version||''),window.ADERENCIA_SCHEDULE_ADAPTIVE_RC62?.version||'ausente');
  add('schedule-adaptive-rc61',/^RC61(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_ADAPTIVE_RC61?.version||''),window.ADERENCIA_SCHEDULE_ADAPTIVE_RC61?.version||'ausente');
  add('schedule-monthly-bridge',/^RC53(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_BRIDGE?.version||''),window.ADERENCIA_SCHEDULE_BRIDGE?.version||'ausente');
@@ -40,7 +43,7 @@ function run(){
  try{const p=window.ADERENCIA_PERIOD?.get?.(),valid=p&&Number.isInteger(+p.month)&&+p.month>=1&&+p.month<=12&&Number.isInteger(+p.year);add('period-state',valid,p?`${p.month}/${p.year}`:'ausente')}catch(e){add('period-state',false,e.message)}
  if(window.ADERENCIA_DIVERGENCE_AUDIT)add('divergence-audit',window.ADERENCIA_DIVERGENCE_AUDIT.ok!==false,window.ADERENCIA_DIVERGENCE_AUDIT.ok===false?'inconsistências detectadas':'ok');
  const ok=checks.every(x=>x.ok);window.ADERENCIA_RC50_HEALTH={ok,checks,cacheStats:window.ADERENCIA_RUNTIME_CACHE?.stats||null,ocr:window.ADERENCIA_OCR_LAZY||null,checkedAt:new Date().toISOString()};
- if(!ok)console.warn('RC62 integrity issues',checks.filter(x=>!x.ok));else console.info('RC62 integrity OK');
+ if(!ok)console.warn('RC63 integrity issues',checks.filter(x=>!x.ok));else console.info('RC63 integrity OK');
  return window.ADERENCIA_RC50_HEALTH;
 }
 const schedule=()=>setTimeout(run,1200);
