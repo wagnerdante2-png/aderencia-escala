@@ -17,25 +17,51 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: rc63-operational-controls-scan
-      - name: Repair RC64 coverage syntax if needed
+      - name: Rebuild RC64 engine from validated RC63.3 baseline
         shell: bash
         run: |
           set -euo pipefail
+          git fetch --no-tags --depth=1 origin 50e6eccd803457392238a9fc367ce24fbe0b8741
+          git show FETCH_HEAD:engine-v3.js > /tmp/engine-rc63.js
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('engine-v3.js')
-          s=p.read_text(encoding='utf-8')
-          s2=s.replace("structuralCoverageFloor:controlled?.92:.95","structuralCoverageFloor:controlled ? .92 : .95",1)
-          s2=s2.replace("function coverageFloor(schedule){return schedule?.source==='pdf-ocr-controlled'&&schedule?.controlledScan===true&&schedule?.scanMeta?.controlled===true&&schedule?.structuralCoverageFloor===.92?.92:.95}","function coverageFloor(schedule){const controlled=schedule?.source==='pdf-ocr-controlled'&&schedule?.controlledScan===true&&schedule?.scanMeta?.controlled===true&&schedule?.structuralCoverageFloor===.92;return controlled ? .92 : .95}",1)
-          if s2 != s:
-              p.write_text(s2,encoding='utf-8')
+          s=Path('/tmp/engine-rc63.js').read_text(encoding='utf-8')
+          def rep(old,new,count=1):
+              global s
+              actual=s.count(old)
+              if actual!=count:
+                  raise SystemExit(f'expected {count} occurrence(s), found {actual}: {old[:100]}')
+              s=s.replace(old,new,count)
+
+          helpers="""function sourceLabel(source){return source==='pdf-ocr-controlled'?'PDF digitalizado + OCR':source==='excel'?'Excel/XLSM':source==='pdf-ocr'?'PDF + OCR':'PDF com texto'}
+          function workbookScanMeta(wb){for(const n of wb?.SheetNames||[]){const rows=safeRows(wb.Sheets[n],14,24,false);for(const row of rows){if(norm(cellText(row?.[0]))!=='RC63 META')continue;const raw={};for(const v of row.slice(1)){const s=cellText(v),p=s.indexOf('=');if(p>0)raw[s.slice(0,p).trim()]=s.slice(p+1).trim()}return{scan:raw.scan==='1',controlled:raw.controlled==='1',coverage:Number(raw.coverage),identityRatio:Number(raw.identity),maxRowMissing:Number(raw.maxRowMissing),maxColMissing:Number(raw.maxColMissing),maxRun:Number(raw.maxRun)}}return null}
+          function closeEnough(a,b,t=0.002){return Number.isFinite(+a)&&Number.isFinite(+b)&&Math.abs(+a-+b)<=t}
+          function verifyScanBridge(wb,runtime){const meta=workbookScanMeta(wb);if(!meta?.scan||runtime?.source!=='pdf-ocr-controlled'||runtime?.distributionSafe!==true)return null;if(+runtime.blankRows!==0||+runtime.blankCols!==0||+runtime.identityRatio<0.60||+runtime.maxRowMissing>0.50||+runtime.maxColMissing>0.50||+runtime.maxRun>7)return null;if(!closeEnough(meta.coverage,runtime.coverage)||!closeEnough(meta.identityRatio,runtime.identityRatio,0.015)||!closeEnough(meta.maxRowMissing,runtime.maxRowMissing,0.01)||!closeEnough(meta.maxColMissing,runtime.maxColMissing,0.01)||+meta.maxRun!==+runtime.maxRun)return null;const controlled=runtime.controlled===true&&meta.controlled===true&&meta.coverage>=0.92&&meta.coverage<0.95;return{meta,controlled,structuralCoverageFloor:controlled ? 0.92 : 0.95}}
+          function coverageFloor(schedule){const controlled=schedule?.source==='pdf-ocr-controlled'&&schedule?.controlledScan===true&&schedule?.scanMeta?.controlled===true&&schedule?.structuralCoverageFloor===0.92;return controlled ? 0.92 : 0.95}
+          function coverageGate(value,schedule){const floor=coverageFloor(schedule);return{ok:Number.isFinite(+value)&&+value>=floor,floor}}
+          """
+          rep('function parseScheduleWorkbook(buffer){',helpers+'function parseScheduleWorkbook(buffer,runtimeMeta=null){')
+          rep("const out={type:'schedule',source:'excel',sheet:ch.sheetName,store:workbookStore(wb,ch.sheetName),periodStart:null,periodEnd:null,employees:new Map(),turns:workbookLegend(wb,ch.sheetName),quality:{sheet:ch.sheetName,realDates:ch.dr.realDates,daySlots:ch.dr.candidates.length,rows:0,codeCells:0}};",
+              "let bridge=verifyScanBridge(wb,runtimeMeta),store=workbookStore(wb,ch.sheetName);if(bridge&&runtimeMeta?.store&&store!==runtimeMeta.store)bridge=null;const out={type:'schedule',source:bridge?'pdf-ocr-controlled':'excel',controlledScan:!!bridge?.controlled,structuralCoverageFloor:bridge?.structuralCoverageFloor??0.95,scanMeta:bridge?.meta||null,sheet:ch.sheetName,store,periodStart:null,periodEnd:null,employees:new Map(),turns:workbookLegend(wb,ch.sheetName),quality:{sheet:ch.sheetName,realDates:ch.dr.realDates,daySlots:ch.dr.candidates.length,rows:0,codeCells:0}};")
+          label="scheduleData.source==='excel'?'Excel/XLSM':scheduleData.source==='pdf-ocr'?'PDF + OCR':'PDF com texto'"
+          if s.count(label)!=2:
+              raise SystemExit(f'expected 2 source labels, found {s.count(label)}')
+          s=s.replace(label,'sourceLabel(scheduleData.source)')
+          rep("if(structCoverage<.95)throw new Error(`Cobertura estrutural ${pct(structCoverage)} abaixo de 95% entre colaboradores conciliados. Resultado bloqueado.`);",
+              "const gate=coverageGate(structCoverage,scheduleData);if(!gate.ok)throw new Error(`Cobertura estrutural ${pct(structCoverage)} abaixo de ${pct(gate.floor,0)} entre colaboradores conciliados. Resultado bloqueado.`);")
+          rep("$('warnings').innerHTML=[`<div>Leitura validada • confiança ${pct(confidence/100)} • cobertura estrutural ${pct(structCoverage)}.</div>`,partial?",
+              "$('warnings').innerHTML=[`<div>Leitura validada • confiança ${pct(confidence/100)} • cobertura estrutural ${pct(structCoverage)}.</div>`,scheduleData.controlledScan?'<div>Grade digitalizada processada em cobertura parcial controlada.</div>':'',partial?")
+          rep("else if(/\\.(xlsx|xlsm|xls)$/.test(n))scheduleData=parseScheduleWorkbook(await file.arrayBuffer());else throw new Error('Formato não suportado.');",
+              "else if(/\\.(xlsx|xlsm|xls)$/.test(n)){const meta=window.ADERENCIA_SCAN_PROVENANCE_RC64?.metaFor?.(file)||null;scheduleData=parseScheduleWorkbook(await file.arrayBuffer(),meta)}else throw new Error('Formato não suportado.');")
+          rep("enable();\n})();", "window.ADERENCIA_ENGINE_RC64={version:'RC64.1',parseScheduleWorkbook,workbookScanMeta,verifyScanBridge,sourceLabel,coverageFloor,coverageGate};\nenable();\n})();")
+          Path('engine-v3.js').write_text(s,encoding='utf-8')
           PY
           node --check engine-v3.js
           if ! git diff --quiet -- engine-v3.js; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add engine-v3.js
-            git commit -m "RC64: repair engine controlled coverage syntax"
+            git commit -m "RC64: rebuild controlled scan bridge on RC63.3 engine"
             git push origin HEAD:rc63-operational-controls-scan
           fi
 
