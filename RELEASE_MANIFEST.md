@@ -1,125 +1,96 @@
-# Manifesto de Release — v1.0 RC63
+# Manifesto de Release — v1.0 RC64
 
-A RC63 consolida a última pendência conhecida de leitura — escalas operacionais digitalizadas em forma de grade — e acrescenta controles operacionais por loja e competência sem alterar a fórmula de aderência.
+A RC64 preserva integralmente as correções RC63/RC63.3 e fecha duas frentes: a proveniência controlada das grades digitalizadas e a nova visão mensal corporativa por regional.
 
-## Escopo da RC63
+## 1. Grade digitalizada: bridge de proveniência RC64
 
-1. fallback visual dedicado a PDF de escala digitalizada sem camada textual utilizável;
-2. reconstrução da grade por geometria, sem depender da leitura OCR dos números 1–30/31;
-3. OCR por linha de colaborador em resolução ampliada;
-4. conciliação conservadora de nomes com o espelho de ponto;
-5. preenchimento de lacunas somente quando turno da legenda, plano do próprio colaborador e padrão da linha são coerentes;
-6. gate estrutural de 95% preservado;
-7. tratativas operacionais por loja + mês + ano;
-8. exceção justificada fora do denominador da rede;
-9. selo vermelho `ENVIO APÓS O PRAZO`, sem redução da nota;
-10. selo verde `CERTIFICADO POR AMOSTRAGEM`, sem alteração da nota;
-11. ML04 permanentemente inativa e bloqueada para salvamento de aderência;
-12. ML24 junho/2026 e julho/2026 pré-cadastradas como exceção por reconstrução após sinistro.
+`schedule-scan-grid-rc63.js` permanece responsável pela reconstrução visual e pelas salvaguardas RC63.2. O scanner continua exigindo distribuição segura das lacunas, sem colaborador inteiro perdido, sem dia inteiro perdido, sem concentração excessiva e sem sequência superior a 7 dias sem leitura.
 
-## Grade digitalizada RC63.1
+A RC64 acrescenta `schedule-scan-provenance-rc64.js` e validação correspondente em `engine-v3.js`.
 
-`schedule-scan-grid-rc63.js` é carregado antes do front-door RC62 e só assume PDFs de uma página cuja camada textual seja praticamente inexistente. PDFs textuais ou formatos já reconhecidos seguem para o pipeline existente.
+O piso global não foi reduzido:
 
-A reconstrução visual:
+- Excel/XLSM/XLS normal: 95%;
+- PDF textual normal: 95%;
+- PDF/OCR normal: 95%;
+- grade digitalizada aprovada pelo scanner, com proveniência comprovada: 92%.
 
-- testa rotações 90°, 270°, 0° e 180°;
-- renderiza a página em escala 3;
-- detecta linhas horizontais e verticais pela projeção de pixels escuros;
-- identifica a sequência regular de colunas do calendário;
-- reconhece mês e ano por token completo;
-- executa OCR da legenda e OCR individual das linhas de colaboradores;
-- amplia as linhas antes do OCR para preservar nomes, cargos e códigos;
-- normaliza confusões recorrentes como `718 → T18`, `TI8 → T18`, `13 → T13`, `TG → T6` e leituras degradadas de `F`;
-- cruza a população com o espelho usando a ponte de identidade OCR já existente.
+Para receber o piso controlado de 92%, o engine exige simultaneamente:
 
-Uma célula não reconhecida não é preenchida livremente. A RC63 só recupera uma célula quando:
+1. o marker `RC63_META` existente dentro do workbook sintético;
+2. proveniência efêmera criada durante o dispatch interno do scanner;
+3. concordância entre cobertura e métricas estruturais do marker e do scanner;
+4. `distributionSafe=true`, `blankRows=0`, `blankCols=0`, identidade >=60%, concentração por linha/dia <=50% e `maxRun<=7`;
+5. cobertura >=92% e <95% com `controlled=1`.
 
-1. a área visual não indica uma exceção escura;
-2. o quadro Horários do próprio colaborador fornece um plano;
-3. esse plano corresponde a um turno existente na legenda da própria escala;
-4. o turno é coerente com vizinhos iguais ou com o turno dominante já reconhecido naquela linha.
+Um XLSX enviado diretamente pelo usuário não recebe esse marker efêmero e continua sujeito a 95%, mesmo que tenha nome semelhante ou contenha uma linha `RC63_META` fabricada.
 
-Se a cobertura estrutural final ficar abaixo de 95%, a escala continua bloqueada.
+A UI mantém a origem real como `PDF digitalizado + OCR` após a conversão sintética. Quando o piso parcial controlado é utilizado, o resultado registra: `Grade digitalizada processada em cobertura parcial controlada.`
 
-## Tratativas operacionais
+## 2. Visão Mensal RC64
 
-`operational-flags-rc63.js` mantém registros por `loja + competência` em `aderenciaOperationalFlagsV1`.
+`monthly-regional-rc64.js` adiciona a aba `Mensal`, sem substituir `Semestral`.
 
-### Exceção de aderência
+A tabela apresenta:
 
-Uma exceção exige justificativa. A loja/competência recebe selo azul `EXCEÇÃO`, não entra na média, não entra nas faixas verde/amarela/vermelha e não é contada como `Sem resultado`.
+`Loja | Jan | Fev | Mar | Abr | Mai | Jun | Jul | Ago | Set | Out | Nov | Dez | Média anual`
 
-Foram semeadas inicialmente:
+As lojas são agrupadas pelo `ADERENCIA_STORE_REGISTRY`. Cada regional termina com `MÉDIA DA REGIONAL` calculada somente sobre resultados elegíveis. A competência é canonicalizada por `periodStart`, seguindo a mesma regra usada no comparativo regional RC51.
 
-- ML24 — junho/2026;
-- ML24 — julho/2026;
+Tratativas RC63 permanecem válidas:
 
-com a justificativa `Loja em reconstrução após sinistro — sem atividade operacional.`
+- ML04: `INATIVA`, fora das médias;
+- exceção: `EXCEÇÃO`, fora das médias;
+- ausência legítima: `—`, nunca zero;
+- envio após o prazo: não altera a nota;
+- certificação por amostragem: não altera a nota;
+- bônus/effective score: utiliza a regra vigente.
 
-### Envio após o prazo
+A aba possui seletor de ano, filtro opcional de regional, scroll horizontal, primeira coluna/cabeçalho sticky e exportação Excel.
 
-Aplica o selo vermelho `ENVIO APÓS O PRAZO`. É um registro de disciplina operacional e não modifica a nota de aderência.
+## 3. Relatório de Monitoramento preservado
 
-### Certificação por amostragem
+`monitor-report-rc63.js` permanece em `RC63.3` com:
 
-Aplica o selo verde `CERTIFICADO POR AMOSTRAGEM` após validação manual. Também não modifica a nota.
+- cabeçalho `Maravilhas do Lar`;
+- logo corporativo otimizado;
+- competência mês/ano;
+- INATIVA;
+- EXCEÇÃO;
+- ENVIO APÓS O PRAZO;
+- CERTIFICAÇÃO POR AMOSTRAGEM.
 
-### Loja inativa
-
-ML04 é permanentemente inativa. O card apresenta `INATIVA`, não participa de média/denominadores e o salvamento de resultado é bloqueado mesmo se houver um valor histórico incorreto.
-
-## Interface
-
-O botão `Tratativas` abre um modal com listas de Loja, Mês e Ano e os três controles operacionais. Um card da aba Monitoramento também pode abrir a tratativa já selecionando aquela loja e competência.
-
-## Base portátil
-
-A base portátil sobe para formato 4 e passa a persistir `operationalFlags`. Bases antigas continuam aceitas; ao carregar uma base RC63, as tratativas são restauradas junto do histórico, cadastro de lojas e divergências.
-
-## Compatibilidade preservada
-
-Continuam válidas as camadas RC51–RC62.1, incluindo:
-
-- competência 11→10 ancorada no início do espelho;
-- leitura Excel/XLSM/XLS;
-- PDF textual e PDF de Escala de Folgas;
-- inferência de mês por token completo;
-- proveniência e identidade de loja;
-- conciliação de população;
-- legenda própria de turnos;
-- gate estrutural de 95%;
-- Tesseract carregado apenas sob demanda.
-
-## Health check RC63
+## 4. Health check e testes
 
 A candidata exige:
 
-- `ADERENCIA_VERSION === 'v1.0 RC63'`;
-- `ADERENCIA_SCAN_GRID_RC63.version === 'RC63.1'`;
-- `ADERENCIA_OPERATIONAL_FLAGS.version === 'RC63.0'`;
-- `ADERENCIA_OPERATIONAL_FLAGS.isInactive('ML04') === true`;
-- `ADERENCIA_SCHEDULE_ADAPTIVE_RC62.version === 'RC62.1'`;
-- `ADERENCIA_SCHEDULE_ADAPTIVE_RC61.version === 'RC61.1'`;
-- `ADERENCIA_RC50_HEALTH.ok === true`.
+- `ADERENCIA_VERSION === 'v1.0 RC64'`;
+- `ADERENCIA_ENGINE_RC64.version === 'RC64.1'`;
+- `ADERENCIA_SCAN_GRID_RC63` preservado;
+- `ADERENCIA_SCAN_PROVENANCE_RC64.version === 'RC64.1'`;
+- `ADERENCIA_MONTHLY_RC64.version === 'RC64.1'`;
+- `ADERENCIA_OPERATIONAL_FLAGS` preservado;
+- ML04 permanentemente inativa.
 
-## Testes adicionais
+A suíte RC64 adiciona regressões para:
 
-A RC63 adiciona regressões para:
+1. grade controlada a 92,5% aceita pelo gate RC64;
+2. Excel a 92,5% bloqueado;
+3. PDF normal a 92,5% bloqueado;
+4. grade controlada abaixo de 92% bloqueada;
+5. proveniência `PDF digitalizado + OCR` preservada após o bridge;
+6. XLSX sem proveniência efêmera incapaz de ativar 92%;
+7. aba Mensal e ano 2026;
+8. valores mensais e média anual por loja;
+9. ML04 INATIVA;
+10. ML24 junho/julho como EXCEÇÃO;
+11. média regional excluindo inativas/exceções;
+12. ausência sem resultado não convertida em zero;
+13. linha `MÉDIA DA REGIONAL` em cada grupo;
+14. `monitor-report-rc63.js` ainda em RC63.3 e estados operacionais preservados.
 
-1. ML24 junho/julho como exceção inicial;
-2. exceção fora da nota e do denominador;
-3. envio tardio e certificação sem alteração da nota;
-4. selos visíveis nos cards;
-5. ML04 sempre inativa, mesmo diante de resultado histórico artificial;
-6. modal de tratativas por loja/mês/ano;
-7. normalização conservadora de códigos OCR;
-8. `MARCOLINO` não confundido com `MARÇO`;
-9. reconstrução geométrica de calendário sem OCR dos números dos dias;
-10. toda a suíte histórica RC51–RC62.1.
+## 5. Pacote
 
-## Pacote
+O workflow passa a produzir `ADERENCIA_ESCALA_RC64_TESTE_WINDOWS.zip` e registra no `BUILD_INFO.txt` as versões do engine, scanner, bridge de proveniência, visão mensal, tratativas e relatório.
 
-O workflow produz `ADERENCIA_ESCALA_RC63_TESTE_WINDOWS.zip`. O `BUILD_INFO.txt` registra commit, workflow, `scan_grid=RC63.1`, `operational_flags=RC63.0`, RC62.1 e RC61.1.
-
-A RC63 só deve ser considerada certificada quando a suíte Playwright concluir verde. Caso a infraestrutura do GitHub Actions não atribua runner, isso deve ser registrado separadamente e não confundido com falha funcional da aplicação.
+O pacote permanece uma aplicação web local completa, iniciada por `index.html`.
