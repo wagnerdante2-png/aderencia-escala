@@ -1,8 +1,8 @@
-name: RC62 Adaptive End-to-End
+name: RC63 Adaptive End-to-End
 
 on:
   push:
-    branches: [rc50-e2e-hardening, rc50-main-consolidation, main]
+    branches: [rc50-e2e-hardening, rc50-main-consolidation, rc63-operational-controls-scan, main]
   workflow_dispatch:
 
 permissions:
@@ -11,7 +11,7 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,19 +21,19 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e:chromium
 
-      - name: Build RC62 Windows test package
+      - name: Build RC63 Windows test package
         if: ${{ success() }}
         shell: bash
         run: |
           set -euo pipefail
-          ROOT="dist/ADERENCIA_ESCALA_RC62"
+          ROOT="dist/ADERENCIA_ESCALA_RC63"
           mkdir -p "$ROOT"
           cp \
             index.html styles.css dashboard.css \
             bootstrap.js engine-v3.js history.js history-report.js export-report.js batch.js \
-            runtime-cache-rc47.js ocr-lazy-rc48.js portable-storage.js pdf-security-rc35.js point-semantics.js \
+            runtime-cache-rc47.js ocr-lazy-rc48.js portable-storage.js operational-flags-rc63.js pdf-security-rc35.js point-semantics.js \
             pdf-xlsx-compat-rc21.js pdf-calendar-integrity-rc29.js canonical-validation-rc35.js \
-            schedule-hardening-rc51.js schedule-adaptive-rc62.js schedule-adaptive-rc61.js schedule-ocr-identity-rc62.js schedule-monthly-bridge-rc53.js schedule-rc59-compat-capture.js schedule-real-xlsm-rc59.js schedule-rc59-compat-guard.js schedule-rc59-point-table-guard.js schedule-provenance-guard-rc55.js \
+            schedule-hardening-rc51.js schedule-scan-grid-rc63.js schedule-adaptive-rc62.js schedule-adaptive-rc61.js schedule-ocr-identity-rc62.js schedule-monthly-bridge-rc53.js schedule-rc59-compat-capture.js schedule-real-xlsm-rc59.js schedule-rc59-compat-guard.js schedule-rc59-point-table-guard.js schedule-provenance-guard-rc55.js \
             schedule-source-identity-guard-rc58.js schedule-preprocess-rc52.js \
             pdf-store-header-guard-rc57.js pdf-schedule-parser-rc57.js \
             monitor-export.js divergence-dashboard-rc44.js divergence-capture-rc20.js divergence-help-rc42.js \
@@ -44,19 +44,19 @@ jobs:
             navigation-integrity-rc44.js rc50-integrity-check.js \
             README.md LEIA-ME_LOCAL.txt RELEASE_MANIFEST.md \
             "$ROOT/"
-          printf 'RC62\nadaptive=RC61.1\nrc62_adapter=RC62.1\nocr_identity=RC62.1\ncommit=%s\nworkflow_run=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$ROOT/BUILD_INFO.txt"
-          (cd dist && zip -r -9 ADERENCIA_ESCALA_RC62_TESTE_WINDOWS.zip ADERENCIA_ESCALA_RC62)
+          printf 'RC63\nscan_grid=RC63.1\noperational_flags=RC63.0\nadaptive=RC61.1\nrc62_adapter=RC62.1\nocr_identity=RC62.1\ncommit=%s\nworkflow_run=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$ROOT/BUILD_INFO.txt"
+          (cd dist && zip -r -9 ADERENCIA_ESCALA_RC63_TESTE_WINDOWS.zip ADERENCIA_ESCALA_RC63)
 
       - uses: actions/upload-artifact@v4
         if: ${{ success() }}
         with:
-          name: aderencia-escala-rc62-windows
-          path: dist/ADERENCIA_ESCALA_RC62_TESTE_WINDOWS.zip
+          name: aderencia-escala-rc63-windows
+          path: dist/ADERENCIA_ESCALA_RC63_TESTE_WINDOWS.zip
           retention-days: 14
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report-rc62
+          name: playwright-report-rc63
           path: playwright-report/
           retention-days: 14
