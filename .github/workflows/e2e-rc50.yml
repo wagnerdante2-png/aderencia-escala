@@ -6,9 +6,39 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  repair-engine:
+    if: ${{ github.ref_name == 'rc63-operational-controls-scan' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rc63-operational-controls-scan
+      - name: Repair RC64 coverage syntax if needed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('engine-v3.js')
+          s=p.read_text(encoding='utf-8')
+          s2=s.replace("structuralCoverageFloor:controlled?.92:.95","structuralCoverageFloor:controlled ? .92 : .95",1)
+          s2=s2.replace("function coverageFloor(schedule){return schedule?.source==='pdf-ocr-controlled'&&schedule?.controlledScan===true&&schedule?.scanMeta?.controlled===true&&schedule?.structuralCoverageFloor===.92?.92:.95}","function coverageFloor(schedule){const controlled=schedule?.source==='pdf-ocr-controlled'&&schedule?.controlledScan===true&&schedule?.scanMeta?.controlled===true&&schedule?.structuralCoverageFloor===.92;return controlled ? .92 : .95}",1)
+          if s2 != s:
+              p.write_text(s2,encoding='utf-8')
+          PY
+          node --check engine-v3.js
+          if ! git diff --quiet -- engine-v3.js; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add engine-v3.js
+            git commit -m "RC64: repair engine controlled coverage syntax"
+            git push origin HEAD:rc63-operational-controls-scan
+          fi
+
   package:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -37,11 +67,7 @@ jobs:
             README.md LEIA-ME_LOCAL.txt RELEASE_MANIFEST.md \
             "$ROOT/"
           printf 'RC64\nengine=RC64.1\nscan_grid=RC63.2\nscan_provenance=RC64.1\nmonthly_regional=RC64.1\noperational_flags=RC63.1\nmonitor_report=RC63.3\nadaptive=RC61.1\nrc62_adapter=RC62.1\nocr_identity=RC62.1\ncontrolled_scan_floor=92%%\nstandard_floor=95%%\ncommit=%s\nworkflow_run=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$ROOT/BUILD_INFO.txt"
-          node --check "$ROOT/engine-v3.js"
-          node --check "$ROOT/schedule-scan-provenance-rc64.js"
-          node --check "$ROOT/monthly-regional-rc64.js"
-          node --check "$ROOT/bootstrap.js"
-          node --check "$ROOT/rc50-integrity-check.js"
+          find "$ROOT" -maxdepth 1 -type f -name '*.js' -print0 | while IFS= read -r -d '' f; do node --check "$f"; done
           (cd dist && zip -r -9 ADERENCIA_ESCALA_RC64_TESTE_WINDOWS.zip ADERENCIA_ESCALA_RC64)
           unzip -t dist/ADERENCIA_ESCALA_RC64_TESTE_WINDOWS.zip
           sha256sum dist/ADERENCIA_ESCALA_RC64_TESTE_WINDOWS.zip | tee dist/ADERENCIA_ESCALA_RC64_TESTE_WINDOWS.sha256
