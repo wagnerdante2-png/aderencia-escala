@@ -2,7 +2,7 @@
 'use strict';
 function run(){
  const checks=[];const add=(name,ok,detail='')=>checks.push({name,ok:!!ok,detail});
- add('version',/^v1\.0 RC(?:5[1-9]|6[0-3])$/.test(window.ADERENCIA_VERSION||''),window.ADERENCIA_VERSION||'ausente');
+ add('version',/^v1\.0 RC64$/.test(window.ADERENCIA_VERSION||''),window.ADERENCIA_VERSION||'ausente');
  const active=window.ADERENCIA_ACTIVE_MODULES||[];
  add('active-modules',Array.isArray(active)&&active.length>10,`${active.length} módulos`);
  add('no-duplicate-modules',new Set(active).size===active.length);
@@ -20,8 +20,11 @@ function run(){
  add('navigation',!!window.ADERENCIA_NAVIGATION);
  add('divergence-dashboard',!!window.ADERENCIA_DIVERGENCE_DASHBOARD);
  add('divergence-capture',!!window.__ADERENCIA_DIVERGENCE_CAPTURE_RC20__);
+ add('engine-rc64',/^RC64(?:\.|$)/.test(window.ADERENCIA_ENGINE_RC64?.version||''),window.ADERENCIA_ENGINE_RC64?.version||'ausente');
  add('schedule-hardening',/^RC51(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_HARDENING?.version||''),window.ADERENCIA_SCHEDULE_HARDENING?.version||'ausente');
  add('schedule-scan-grid-rc63',/^RC63(?:\.|$)/.test(window.ADERENCIA_SCAN_GRID_RC63?.version||''),window.ADERENCIA_SCAN_GRID_RC63?.version||'ausente');
+ add('schedule-scan-provenance-rc64',/^RC64(?:\.|$)/.test(window.ADERENCIA_SCAN_PROVENANCE_RC64?.version||''),window.ADERENCIA_SCAN_PROVENANCE_RC64?.version||'ausente');
+ add('monthly-regional-rc64',/^RC64(?:\.|$)/.test(window.ADERENCIA_MONTHLY_RC64?.version||''),window.ADERENCIA_MONTHLY_RC64?.version||'ausente');
  add('operational-flags-rc63',/^RC63(?:\.|$)/.test(window.ADERENCIA_OPERATIONAL_FLAGS?.version||''),window.ADERENCIA_OPERATIONAL_FLAGS?.version||'ausente');
  add('ml04-permanent-inactive',window.ADERENCIA_OPERATIONAL_FLAGS?.isInactive?.('ML04')===true);
  add('schedule-adaptive-rc62',/^RC62(?:\.|$)/.test(window.ADERENCIA_SCHEDULE_ADAPTIVE_RC62?.version||''),window.ADERENCIA_SCHEDULE_ADAPTIVE_RC62?.version||'ausente');
@@ -39,11 +42,12 @@ function run(){
  add('recurrence',!!window.ADERENCIA_RECURRENCE);
  add('store-registry',!!window.ADERENCIA_STORE_REGISTRY);
  add('ml61-region',window.ADERENCIA_STORE_REGISTRY?.regionOf?.('ML61')==='GUARDIÕES DA CHAMA',window.ADERENCIA_STORE_REGISTRY?.regionOf?.('ML61')||'ausente');
+ try{const g=window.ADERENCIA_ENGINE_RC64?.coverageGate?.(.925,{source:'pdf-ocr-controlled',controlledScan:true,scanMeta:{controlled:true},structuralCoverageFloor:.92}),x=window.ADERENCIA_ENGINE_RC64?.coverageGate?.(.925,{source:'excel'});add('controlled-coverage-policy',g?.ok===true&&g?.floor===.92&&x?.ok===false&&x?.floor===.95)}catch(e){add('controlled-coverage-policy',false,e.message)}
  try{const sample=[{store:'ML01',month:6,year:2026,occurrences:[{employee:'TESTE',registration:'1',type:'DESVIO_ENTRADA_GT_90'}]},{store:'ML01',month:7,year:2026,occurrences:[{employee:'TESTE',registration:'1',type:'DESVIO_ENTRADA_GT_90'}]}],a=window.ADERENCIA_RECURRENCE?.aggregate?.(sample,'all'),s=a?.stores?.[0];add('recurrence-rule',!!s&&s.repeat.size===1&&s.people.size===1)}catch(e){add('recurrence-rule',false,e.message)}
  try{const p=window.ADERENCIA_PERIOD?.get?.(),valid=p&&Number.isInteger(+p.month)&&+p.month>=1&&+p.month<=12&&Number.isInteger(+p.year);add('period-state',valid,p?`${p.month}/${p.year}`:'ausente')}catch(e){add('period-state',false,e.message)}
  if(window.ADERENCIA_DIVERGENCE_AUDIT)add('divergence-audit',window.ADERENCIA_DIVERGENCE_AUDIT.ok!==false,window.ADERENCIA_DIVERGENCE_AUDIT.ok===false?'inconsistências detectadas':'ok');
  const ok=checks.every(x=>x.ok);window.ADERENCIA_RC50_HEALTH={ok,checks,cacheStats:window.ADERENCIA_RUNTIME_CACHE?.stats||null,ocr:window.ADERENCIA_OCR_LAZY||null,checkedAt:new Date().toISOString()};
- if(!ok)console.warn('RC63 integrity issues',checks.filter(x=>!x.ok));else console.info('RC63 integrity OK');
+ if(!ok)console.warn('RC64 integrity issues',checks.filter(x=>!x.ok));else console.info('RC64 integrity OK');
  return window.ADERENCIA_RC50_HEALTH;
 }
 const schedule=()=>setTimeout(run,1200);
