@@ -1,0 +1,90 @@
+name: RC64 Acceptance and Windows Package
+
+on:
+  push:
+    branches: [rc63-operational-controls-scan]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install test dependencies
+        run: npm install
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Static syntax gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check engine-v3.js
+          node --check schedule-scan-provenance-rc64.js
+          node --check monthly-regional-rc64.js
+          node --check monitor-report-rc63.js
+          node --check operational-flags-rc63.js
+          node --check bootstrap.js
+      - name: RC64 acceptance tests
+        run: npx playwright test tests/e2e/rc64-operational-monthly.spec.js --project=chromium
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: rc64-acceptance-failure-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  package:
+    needs: acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build complete RC64 Windows package
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="dist/ADERENCIA_ESCALA_RC64"
+          rm -rf dist
+          mkdir -p "$ROOT"
+          cp \
+            index.html styles.css dashboard.css \
+            bootstrap.js engine-v3.js history.js history-report.js export-report.js batch.js \
+            runtime-cache-rc47.js ocr-lazy-rc48.js portable-storage.js operational-flags-rc63.js report-brand-rc63.js monitor-report-rc63.js report-logo-mdl.png pdf-security-rc35.js point-semantics.js \
+            pdf-xlsx-compat-rc21.js pdf-calendar-integrity-rc29.js canonical-validation-rc35.js \
+            schedule-hardening-rc51.js schedule-scan-grid-rc63.js schedule-scan-provenance-rc64.js schedule-adaptive-rc62.js schedule-adaptive-rc61.js schedule-ocr-identity-rc62.js schedule-monthly-bridge-rc53.js schedule-rc59-compat-capture.js schedule-real-xlsm-rc59.js schedule-rc59-compat-guard.js schedule-rc59-point-table-guard.js schedule-provenance-guard-rc55.js \
+            schedule-source-identity-guard-rc58.js schedule-preprocess-rc52.js \
+            pdf-store-header-guard-rc57.js pdf-schedule-parser-rc57.js \
+            monitor-export.js divergence-dashboard-rc44.js divergence-capture-rc20.js divergence-help-rc42.js \
+            layout-fixes-rc19.js store-management.js ui-final-rc35.js network-led-panel-rc36.js \
+            competence-integrity-rc38.js region-view-integrity-rc38.js period-controller-rc39.js \
+            period-render-coherence-rc44.js evolution-dashboard-rc39.js regional-comparison-rc51.js monthly-regional-rc64.js \
+            performance-rc42.js divergence-audit-rc42.js recurrence-dashboard-rc44.js \
+            navigation-integrity-rc44.js rc50-integrity-check.js \
+            README.md LEIA-ME_LOCAL.txt RELEASE_MANIFEST.md \
+            "$ROOT/"
+          printf 'RC64\nengine=RC64.1\nscan_grid=RC63.2\nscan_provenance=RC64.1\nmonthly_regional=RC64.1\noperational_flags=RC63.1\nmonitor_report=RC63.3\ncontrolled_scan_floor=92%%\nstandard_floor=95%%\ncommit=%s\nworkflow_run=%s\nacceptance=RC64_TARGETED_PASS\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$ROOT/BUILD_INFO.txt"
+          find "$ROOT" -maxdepth 1 -type f -name '*.js' -print0 | while IFS= read -r -d '' f; do node --check "$f"; done
+          test -f "$ROOT/index.html"
+          test -f "$ROOT/engine-v3.js"
+          test -f "$ROOT/monthly-regional-rc64.js"
+          test -f "$ROOT/schedule-scan-provenance-rc64.js"
+          test -f "$ROOT/monitor-report-rc63.js"
+          (cd dist && zip -r -9 ADERENCIA_ESCALA_RC64_TESTE_WINDOWS.zip ADERENCIA_ESCALA_RC64)
+          unzip -t dist/ADERENCIA_ESCALA_RC64_TESTE_WINDOWS.zip
+          sha256sum dist/ADERENCIA_ESCALA_RC64_TESTE_WINDOWS.zip | tee dist/ADERENCIA_ESCALA_RC64_TESTE_WINDOWS.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aderencia-escala-rc64-windows-accepted
+          path: |
+            dist/ADERENCIA_ESCALA_RC64_TESTE_WINDOWS.zip
+            dist/ADERENCIA_ESCALA_RC64_TESTE_WINDOWS.sha256
+          retention-days: 14
