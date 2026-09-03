@@ -1,165 +1,125 @@
-# Manifesto de Release — v1.0 RC62
+# Manifesto de Release — v1.0 RC63
 
-Este manifesto registra o runtime ativo, as correções derivadas do teste operacional, os controles de segurança e os critérios de aceite da candidata operacional RC62 para uso local.
+A RC63 consolida a última pendência conhecida de leitura — escalas operacionais digitalizadas em forma de grade — e acrescenta controles operacionais por loja e competência sem alterar a fórmula de aderência.
 
-## Objetivo da RC62
+## Escopo da RC63
 
-A RC62 corrige comportamentos observados em teste manual real:
+1. fallback visual dedicado a PDF de escala digitalizada sem camada textual utilizável;
+2. reconstrução da grade por geometria, sem depender da leitura OCR dos números 1–30/31;
+3. OCR por linha de colaborador em resolução ampliada;
+4. conciliação conservadora de nomes com o espelho de ponto;
+5. preenchimento de lacunas somente quando turno da legenda, plano do próprio colaborador e padrão da linha são coerentes;
+6. gate estrutural de 95% preservado;
+7. tratativas operacionais por loja + mês + ano;
+8. exceção justificada fora do denominador da rede;
+9. selo vermelho `ENVIO APÓS O PRAZO`, sem redução da nota;
+10. selo verde `CERTIFICADO POR AMOSTRAGEM`, sem alteração da nota;
+11. ML04 permanentemente inativa e bloqueada para salvamento de aderência;
+12. ML24 junho/2026 e julho/2026 pré-cadastradas como exceção por reconstrução após sinistro.
 
-1. PDFs de **Escala de Folgas** com matriz esparsa eram rejeitados como se a grade Nome × Dias não existisse;
-2. PDF-imagem com orientação inadequada precisava de OCR em rotações alternativas;
-3. escalas reconhecidas parcialmente precisavam ser recompostas com segurança pelo quadro Horários antes do gate estrutural;
-4. a inferência antiga de mês por substring podia confundir sobrenomes — por exemplo, `MARCOLINO` — com o mês `MARÇO`;
-5. OCR de tabelas digitalizadas precisava reconstruir o calendário mesmo quando parte dos números dos dias não fosse reconhecida;
-6. códigos e cargos sujeitos a confusões típicas de OCR precisavam de normalização conservadora antes da conciliação.
+## Grade digitalizada RC63.1
 
-A solução não remove o gate estrutural. A RC62 corrige a interpretação da fonte e mantém a filosofia fail-closed.
+`schedule-scan-grid-rc63.js` é carregado antes do front-door RC62 e só assume PDFs de uma página cuja camada textual seja praticamente inexistente. PDFs textuais ou formatos já reconhecidos seguem para o pipeline existente.
 
-## Runtime essencial
+A reconstrução visual:
 
-Arquivos base:
+- testa rotações 90°, 270°, 0° e 180°;
+- renderiza a página em escala 3;
+- detecta linhas horizontais e verticais pela projeção de pixels escuros;
+- identifica a sequência regular de colunas do calendário;
+- reconhece mês e ano por token completo;
+- executa OCR da legenda e OCR individual das linhas de colaboradores;
+- amplia as linhas antes do OCR para preservar nomes, cargos e códigos;
+- normaliza confusões recorrentes como `718 → T18`, `TI8 → T18`, `13 → T13`, `TG → T6` e leituras degradadas de `F`;
+- cruza a população com o espelho usando a ponte de identidade OCR já existente.
 
-- `index.html`
-- `styles.css`
-- `dashboard.css`
-- `bootstrap.js`
-- `engine-v3.js`
-- `schedule-adaptive-rc62.js`
-- `schedule-adaptive-rc61.js`
-- `history.js`
-- `history-report.js`
-- `export-report.js`
-- `batch.js`
-- `LEIA-ME_LOCAL.txt`
-- `README.md`
+Uma célula não reconhecida não é preenchida livremente. A RC63 só recupera uma célula quando:
 
-`window.ADERENCIA_ACTIVE_MODULES` é a fonte de verdade para os módulos carregados pelo bootstrap.
+1. a área visual não indica uma exceção escura;
+2. o quadro Horários do próprio colaborador fornece um plano;
+3. esse plano corresponde a um turno existente na legenda da própria escala;
+4. o turno é coerente com vizinhos iguais ou com o turno dominante já reconhecido naquela linha.
 
-## Arquitetura adaptativa RC62
+Se a cobertura estrutural final ficar abaixo de 95%, a escala continua bloqueada.
 
-`schedule-adaptive-rc62.js` — runtime **`RC62.1`** — é carregado imediatamente antes de `schedule-adaptive-rc61.js`.
+## Tratativas operacionais
 
-A RC62 assume o front-door de PDFs. Para PDF textual denso, reutiliza o parser RC61 já certificado. Para PDF identificado como Escala de Folgas, usa a política esparsa/híbrida. Para PDF sem camada textual suficiente, aciona OCR sob demanda e tenta orientações alternativas.
+`operational-flags-rc63.js` mantém registros por `loja + competência` em `aderenciaOperationalFlagsV1`.
 
-Excel/XLSM/XLS continua no front-door RC61/RC59, preservando as regressões anteriores.
+### Exceção de aderência
 
-A saída normalizada permanece uma grade XLSX canônica com prefixo `RC51_RC61_<LOJA>_...xlsx`, mantendo compatibilidade com as camadas históricas e com o motor atual.
+Uma exceção exige justificativa. A loja/competência recebe selo azul `EXCEÇÃO`, não entra na média, não entra nas faixas verde/amarela/vermelha e não é contada como `Sem resultado`.
 
-## Escala de Folgas esparsa
+Foram semeadas inicialmente:
 
-A RC62 parte da semântica operacional de que uma **Escala de Folgas** pode materializar principalmente exceções e eventos, deixando dias normais de trabalho em branco.
+- ML24 — junho/2026;
+- ML24 — julho/2026;
 
-A política é:
+com a justificativa `Loja em reconstrução após sinistro — sem atividade operacional.`
 
-1. o modo só é habilitado com evidência de Escala de Folgas no nome ou conteúdo;
-2. dias são identificados por calendário e coordenadas da grade;
-3. códigos explícitos são associados à posição real da célula;
-4. linhas com baixa densidade continuam elegíveis quando Nome e Cargo são reconhecíveis;
-5. a população é conciliada com o espelho;
-6. células vazias são preenchidas somente quando o quadro **Horários** daquele colaborador no próprio espelho fornece previsão segura;
-7. horário que coincide com a legenda reutiliza o turno existente;
-8. horário sem código equivalente pode receber `T80`–`T99` como código técnico interno, preservando exatamente entrada/saída previstas;
-9. código explícito de turno sem horário na legenda continua bloqueado;
-10. nenhuma previsão é inventada e nenhum turno é copiado de outro colaborador.
+### Envio após o prazo
 
-`WCA` é reconhecido como cargo operacional válido.
+Aplica o selo vermelho `ENVIO APÓS O PRAZO`. É um registro de disciplina operacional e não modifica a nota de aderência.
 
-## Gate estrutural de 95%
+### Certificação por amostragem
 
-A RC62 distingue:
+Aplica o selo verde `CERTIFICADO POR AMOSTRAGEM` após validação manual. Também não modifica a nota.
 
-- **cobertura temporal:** datas da escala que cruzam o período do ponto;
-- **cobertura estrutural:** quanto das marcações dos colaboradores conciliados possui informação de escala utilizável.
+### Loja inativa
 
-Não existe exigência universal de 95% de cobertura temporal para aceitar um PDF. A análise pode ser proporcional à interseção real.
+ML04 é permanentemente inativa. O card apresenta `INATIVA`, não participa de média/denominadores e o salvamento de resultado é bloqueado mesmo se houver um valor histórico incorreto.
 
-O motor mantém o gate de **95% de cobertura estrutural** após a reconciliação. Na Escala de Folgas, a RC62 primeiro recompõe com segurança os dias vazios pelo quadro Horários e só depois deixa o motor calcular essa cobertura. Se ainda permanecer abaixo de 95%, o resultado é bloqueado.
+## Interface
 
-## PDF imagem, autorrotação e OCR tabular RC62.1
+O botão `Tratativas` abre um modal com listas de Loja, Mês e Ano e os três controles operacionais. Um card da aba Monitoramento também pode abrir a tratativa já selecionando aquela loja e competência.
 
-A camada textual é tentada primeiro. Quando não produz estrutura suficiente, a RC62 usa `ADERENCIA_ENSURE_OCR()` e pode tentar 0°, 90°, 270° e 180°.
+## Base portátil
 
-Na RC62.1, quando o OCR bruto reconhece evidência de uma escala operacional mas não consegue reconstruir a matriz, é executada uma segunda leitura tabular:
+A base portátil sobe para formato 4 e passa a persistir `operationalFlags`. Bases antigas continuam aceitas; ao carregar uma base RC63, as tratativas são restauradas junto do histórico, cadastro de lojas e divergências.
 
-- a área útil é detectada por densidade de tinta;
-- sequências regulares de linhas verticais e horizontais identificam a geometria da grade;
-- o fundo de cada célula é normalizado localmente, permitindo ler texto claro sobre células escuras e texto escuro sobre células claras;
-- um OCR em modo de bloco único é executado sobre a tabela preparada;
-- a geometria de colunas pode reconstruir o calendário completo quando apenas parte dos números dos dias foi reconhecida;
-- OCR bruto continua sendo preservado como fonte de cabeçalho e legenda.
+## Compatibilidade preservada
 
-A normalização de códigos cobre confusões conservadoras observadas na matriz, como `113 → T13`, `718 → T18`, `TG → T6` e `T1D → T14`. Cargos também recebem correções limitadas, como `LIDER CAIKA → LIDER CAIXA`.
+Continuam válidas as camadas RC51–RC62.1, incluindo:
 
-## Inferência de mês RC62.1
+- competência 11→10 ancorada no início do espelho;
+- leitura Excel/XLSM/XLS;
+- PDF textual e PDF de Escala de Folgas;
+- inferência de mês por token completo;
+- proveniência e identidade de loja;
+- conciliação de população;
+- legenda própria de turnos;
+- gate estrutural de 95%;
+- Tesseract carregado apenas sob demanda.
 
-O mês não é mais procurado como substring arbitrária em todo o texto. A RC62.1 exige o nome do mês como **token completo**, priorizando a área inicial/cabeçalho. Assim, sobrenomes como `MARCOLINO` não podem ser interpretados como `MARÇO`.
-
-## Diagnóstico de período
-
-A RC62 tenta reconhecer o calendário da fonte antes de classificar uma falha como estrutural. Quando escala e espelho realmente não se cruzam, o erro apresenta os intervalos reconhecidos.
-
-A verificação de período só é considerada conclusiva depois de mês/ano e grade de dias terem sido determinados por evidência suficiente; inferências derivadas de substring ou de OCR incompleto não devem produzir um falso período.
-
-## Política RC61 preservada
-
-Continuam válidos:
-
-- competência ancorada no início do período integral do espelho;
-- escala 01→30/31 comparável proporcionalmente com espelho 11→10;
-- população variável por admissões/desligamentos;
-- conciliação por matrícula/nome;
-- turnos resolvidos pela legenda da própria versão;
-- exceção diária limitada à data correspondente;
-- preenchimento seguro de lacunas de Excel a partir do quadro Horários;
-- proveniência RC55 e identidade RC58;
-- invalidação do estado anterior ao processar nova escala.
-
-## Segurança
-
-- PDF.js usa `isEvalSupported=false` e scripting desabilitado;
-- Tesseract.js 5.x permanece lazy e não é carregado no startup;
-- população incompatível não é aceita para aumentar cobertura;
-- turnos explícitos sem legenda não recebem horário inventado;
-- período realmente sem interseção é bloqueado;
-- o gate estrutural de 95% permanece ativo;
-- artefatos sintéticos continuam identificados para impedir relabeling de origem.
-
-## Health check RC62
-
-Por compatibilidade histórica, o objeto consolidado continua se chamando `ADERENCIA_RC50_HEALTH`.
+## Health check RC63
 
 A candidata exige:
 
-`ADERENCIA_VERSION === 'v1.0 RC62'`
+- `ADERENCIA_VERSION === 'v1.0 RC63'`;
+- `ADERENCIA_SCAN_GRID_RC63.version === 'RC63.1'`;
+- `ADERENCIA_OPERATIONAL_FLAGS.version === 'RC63.0'`;
+- `ADERENCIA_OPERATIONAL_FLAGS.isInactive('ML04') === true`;
+- `ADERENCIA_SCHEDULE_ADAPTIVE_RC62.version === 'RC62.1'`;
+- `ADERENCIA_SCHEDULE_ADAPTIVE_RC61.version === 'RC61.1'`;
+- `ADERENCIA_RC50_HEALTH.ok === true`.
 
-`ADERENCIA_SCHEDULE_ADAPTIVE_RC62.version === 'RC62.1'`
+## Testes adicionais
 
-`ADERENCIA_SCHEDULE_ADAPTIVE_RC61.version` continua começando com `RC61`
+A RC63 adiciona regressões para:
 
-`ADERENCIA_RC50_HEALTH.ok === true`
+1. ML24 junho/julho como exceção inicial;
+2. exceção fora da nota e do denominador;
+3. envio tardio e certificação sem alteração da nota;
+4. selos visíveis nos cards;
+5. ML04 sempre inativa, mesmo diante de resultado histórico artificial;
+6. modal de tratativas por loja/mês/ano;
+7. normalização conservadora de códigos OCR;
+8. `MARCOLINO` não confundido com `MARÇO`;
+9. reconstrução geométrica de calendário sem OCR dos números dos dias;
+10. toda a suíte histórica RC51–RC62.1.
 
-## Testes de aceite adicionais RC62.1
+## Pacote
 
-Além de toda a suíte histórica:
+O workflow produz `ADERENCIA_ESCALA_RC63_TESTE_WINDOWS.zip`. O `BUILD_INFO.txt` registra commit, workflow, `scan_grid=RC63.1`, `operational_flags=RC63.0`, RC62.1 e RC61.1.
 
-1. reconhecer uma Escala de Folgas de 31 dias com poucos códigos explícitos por colaborador;
-2. manter cada `F`/evento na data determinada pela coordenada original;
-3. preencher dias vazios somente a partir do plano do próprio colaborador no espelho;
-4. reconhecer `WCA` como cargo válido;
-5. diagnosticar período sem interseção somente com calendário confiável;
-6. garantir que `MARCOLINO` não seja confundido com `MARÇO` quando o cabeçalho informa `JULHO 2026`;
-7. reconstruir 31 dias de julho a partir de âncoras OCR parciais e espaçamento regular;
-8. normalizar confusões de turno/cargo observadas no OCR sem criar códigos fora da faixa reconhecida;
-9. manter Tesseract fora do startup;
-10. manter todas as regressões RC51–RC62 verdes;
-11. construir o pacote Windows somente depois de toda a suíte Playwright verde.
-
-## Certificação e pacote
-
-A identificação exata do commit e da execução que geraram o pacote fica em `BUILD_INFO.txt`. O workflow produz `ADERENCIA_ESCALA_RC62_TESTE_WINDOWS.zip` e registra `rc62_adapter=RC62.1`.
-
-O ZIP deve ser validado por integridade, referências locais e coerência de versão antes de distribuição.
-
-## Congelamento da rodada
-
-A RC62.1 é a revisão derivada diretamente dos dois problemas restantes observados no teste manual da RC62. Novas alterações posteriores devem preservar este marco no histórico de commits e Actions.
+A RC63 só deve ser considerada certificada quando a suíte Playwright concluir verde. Caso a infraestrutura do GitHub Actions não atribua runner, isso deve ser registrado separadamente e não confundido com falha funcional da aplicação.
