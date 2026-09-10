@@ -35,6 +35,7 @@ function buildRows(month,year){
     const r=by.get(store)||null;
     const raw=r?Number(r.adherence):NaN;
     const eff=r?H.effective(r):NaN;
+    const adjustment=r?(H.adjustmentPercent?.(r)??(r.bonus?10:0)):null;
     return {
       'Competência':`${String(month).padStart(2,'0')}/${year}`,
       'Ano':year,
@@ -43,7 +44,7 @@ function buildRows(month,year){
       'Loja':stores[store]||'',
       'Regional':registry?.regionOf?.(store)||'',
       'Aderência Original (%)':pct(raw),
-      'Ajuste Eletivo +10%':r?.bonus?'SIM':'NÃO',
+      'Ajuste Eletivo (%)':adjustment,
       'Aderência Considerada (%)':pct(eff),
       'Semáforo':semaforo(eff),
       'Possui Resultado':r?'SIM':'NÃO',
@@ -66,7 +67,7 @@ function summary(rows,month,year){
     {'Indicador':'Verde (≥95%)','Valor':valid.filter(r=>r.Semáforo==='VERDE').length},
     {'Indicador':'Amarelo (80–94,99%)','Valor':valid.filter(r=>r.Semáforo==='AMARELO').length},
     {'Indicador':'Vermelho (<80%)','Valor':valid.filter(r=>r.Semáforo==='VERMELHO').length},
-    {'Indicador':'Com ajuste eletivo +10%','Valor':valid.filter(r=>r['Ajuste Eletivo +10%']==='SIM').length}
+    {'Indicador':'Com ajuste eletivo','Valor':valid.filter(r=>Number(r['Ajuste Eletivo (%)'])>0).length}
   ];
 }
 function autosize(ws,rows){
