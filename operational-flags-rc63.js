@@ -1,35 +1,271 @@
 (function(){
 'use strict';
+
 if(window.__ADERENCIA_OPERATIONAL_FLAGS_RC63__)return;
 window.__ADERENCIA_OPERATIONAL_FLAGS_RC63__=true;
-const VERSION='RC63.1',KEY='aderenciaOperationalFlagsV1',INACTIVE=new Set(['ML04']);
+
+const VERSION='RC63.2';
+const KEY='aderenciaOperationalFlagsV1';
+const DIVERGENCE_KEY='aderenciaDivergenciasV1';
+const INACTIVE=new Set(['ML04']);
 const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const $=id=>document.getElementById(id),key=(s,m,y)=>`${s}|${y}|${m}`;
+const $=id=>document.getElementById(id);
+const key=(s,m,y)=>`${s}|${y}|${m}`;
+
 function read(){try{const x=JSON.parse(localStorage.getItem(KEY)||'{}');return x&&typeof x==='object'&&!Array.isArray(x)?x:{}}catch{return{}}}
 function write(x){localStorage.setItem(KEY,JSON.stringify(x));window.dispatchEvent(new CustomEvent('aderencia:operationalflagschange'));window.ADERENCIA_HISTORY?.notify?.();setTimeout(refreshAll,20)}
-function seed(){const x=read(),now='2026-09-03T00:00:00.000Z';[['ML24',6,2026],['ML24',7,2026]].forEach(([s,m,y])=>{const k=key(s,m,y);if(!x[k])x[k]={store:s,month:m,year:y,exception:true,exceptionReason:'Loja em reconstrução após sinistro — sem atividade operacional.',late:false,certified:false,updatedAt:now,seeded:true}});localStorage.setItem(KEY,JSON.stringify(x))}
+function seed(){
+  const x=read(),now='2026-09-03T00:00:00.000Z';
+  [['ML24',6,2026],['ML24',7,2026]].forEach(([s,m,y])=>{
+    const k=key(s,m,y);
+    if(!x[k])x[k]={store:s,month:m,year:y,exception:true,exceptionReason:'Loja em reconstrução após sinistro — sem atividade operacional.',late:false,certified:false,updatedAt:now,seeded:true};
+  });
+  localStorage.setItem(KEY,JSON.stringify(x));
+}
 function get(store,month,year){return read()[key(store,+month,+year)]||{store,month:+month,year:+year,exception:false,exceptionReason:'',late:false,certified:false}}
-function set(v){const x=read(),k=key(v.store,+v.month,+v.year);if(!v.exception&&!v.late&&!v.certified)delete x[k];else x[k]={store:v.store,month:+v.month,year:+v.year,exception:!!v.exception,exceptionReason:v.exception?String(v.exceptionReason||'').trim():'',late:!!v.late,certified:!!v.certified,updatedAt:new Date().toISOString()};write(x)}
+function set(v){
+  const x=read(),k=key(v.store,+v.month,+v.year);
+  if(!v.exception&&!v.late&&!v.certified)delete x[k];
+  else x[k]={store:v.store,month:+v.month,year:+v.year,exception:!!v.exception,exceptionReason:v.exception?String(v.exceptionReason||'').trim():'',late:!!v.late,certified:!!v.certified,updatedAt:new Date().toISOString()};
+  write(x);
+}
 function isInactive(store){return INACTIVE.has(String(store||''))}
 function isException(store,month,year){return !!get(store,month,year).exception}
-function score(row){if(!row||isInactive(row.store)||isException(row.store,row.month,row.year))return NaN;const v=Number(row.adherence);return Number.isFinite(v)?Math.min(100,v*(row.bonus?1.10:1)):NaN}
+function score(row){
+  if(!row||isInactive(row.store)||isException(row.store,row.month,row.year))return NaN;
+  const H=window.ADERENCIA_HISTORY;
+  if(H?.effective){
+    const v=H.effective(row);
+    return Number.isFinite(v)?v:NaN;
+  }
+  const v=Number(row.adherence),p=Number(row.adjustmentPercent);
+  const adjustment=[0,10,20,30,40,50].includes(p)?p:(row.bonus?10:0);
+  return Number.isFinite(v)?Math.min(100,v*(1+adjustment/100)):NaN;
+}
 function fmt(v){return Number.isFinite(v)?`${v.toFixed(2).replace('.',',')}%`:'—'}
 function badge(text,cls,title=''){return`<span class="op-badge ${cls}"${title?` title="${String(title).replace(/"/g,'&quot;')}"`:''}>${text}</span>`}
-function allowed(regionId){const all=Object.keys(window.ADERENCIA_STORES||{}),sel=$(regionId)?.value;if(!sel||sel==='all')return new Set(all);const codes=window.ADERENCIA_STORE_REGISTRY?.codesFor?.(sel);return new Set(Array.isArray(codes)?codes:all)}
+function allowed(regionId){
+  const all=Object.keys(window.ADERENCIA_STORES||{}),sel=$(regionId)?.value;
+  if(!sel||sel==='all')return new Set(all);
+  const codes=window.ADERENCIA_STORE_REGISTRY?.codesFor?.(sel);
+  return new Set(Array.isArray(codes)?codes:all);
+}
 function monitorPeriod(){return{month:+($('monitorMonth')?.value||$('networkLedMonth')?.value||new Date().getMonth()+1),year:+($('monitorYear')?.value||$('networkLedYear')?.value||new Date().getFullYear())}}
 function cardClass(v){return!Number.isFinite(v)?'nodata':v>=95?'green':v>=80?'yellow':'red'}
-function decorateMonitor(){const grid=$('monitorGrid');if(!grid)return;const{month,year}=monitorPeriod(),rows=window.ADERENCIA_HISTORY?.load?.()||[],by=new Map(rows.filter(r=>+r.month===month&&+r.year===year).map(r=>[r.store,r])),okStores=allowed('monitorRegion');let withData=0,g=0,a=0,r=0,eligible=0;for(const card of grid.querySelectorAll('.monitor-card')){const store=card.querySelector('strong')?.textContent?.trim();if(!store)continue;card.hidden=!okStores.has(store);if(card.hidden)continue;card.querySelectorAll('.op-badges').forEach(x=>x.remove());const fl=get(store,month,year),value=score(by.get(store)),box=document.createElement('div');box.className='op-badges';card.onclick=ev=>{if(!ev.target.closest('button'))openModal(store,month,year)};card.classList.remove('green','yellow','red','nodata','inactive','exception');if(isInactive(store)){card.dataset.operationalStatus='inactive';card.classList.add('inactive');const b=card.querySelector('b');if(b)b.textContent='INATIVA';box.innerHTML=badge('INATIVA','inactive');card.appendChild(box);continue}if(fl.exception){card.dataset.operationalStatus='exception';card.classList.add('exception');const b=card.querySelector('b');if(b)b.textContent='EXCEÇÃO';box.innerHTML=badge('EXCEÇÃO','exception',fl.exceptionReason);if(fl.late)box.innerHTML+=badge('ENVIO APÓS O PRAZO','late');if(fl.certified)box.innerHTML+=badge('CERTIFICADO POR AMOSTRAGEM','certified');card.appendChild(box);continue}eligible++;card.dataset.operationalStatus='normal';const cls=cardClass(value);card.classList.add(cls);const b=card.querySelector('b');if(b)b.textContent=fmt(value);if(Number.isFinite(value)){withData++;if(value>=95)g++;else if(value>=80)a++;else r++}if(fl.late)box.innerHTML+=badge('ENVIO APÓS O PRAZO','late');if(fl.certified)box.innerHTML+=badge('CERTIFICADO POR AMOSTRAGEM','certified');if(box.innerHTML)card.appendChild(box)}if($('monWithData'))$('monWithData').textContent=withData;if($('monGreen'))$('monGreen').textContent=g;if($('monYellow'))$('monYellow').textContent=a;if($('monRed'))$('monRed').textContent=r;if($('monMissing'))$('monMissing').textContent=Math.max(0,eligible-withData)}
-function decorateNetwork(){const m=+$('networkLedMonth')?.value,y=+$('networkLedYear')?.value;if(!m||!y||!$('networkLedPanel'))return;const stores=Object.keys(window.ADERENCIA_STORES||{}),rows=window.ADERENCIA_HISTORY?.load?.()||[],by=new Map(rows.filter(r=>+r.month===m&&+r.year===y).map(r=>[r.store,r]));let green=0,yellow=0,red=0,eligible=0;const values=[];for(const s of stores){if(isInactive(s)||isException(s,m,y))continue;eligible++;const v=score(by.get(s));if(!Number.isFinite(v))continue;values.push(v);if(v>=95)green++;else if(v>=80)yellow++;else red++}const avg=values.length?values.reduce((a,b)=>a+b,0)/values.length:NaN,missing=Math.max(0,eligible-values.length),pct=n=>eligible?`${Math.round(n/eligible*100)}% da base elegível`:'0% da base elegível';if($('networkAvg'))$('networkAvg').textContent=fmt(avg);if($('networkCoverage'))$('networkCoverage').textContent=`${values.length} de ${eligible} lojas elegíveis com resultado`;if($('networkGreen'))$('networkGreen').textContent=green;if($('networkYellow'))$('networkYellow').textContent=yellow;if($('networkRed'))$('networkRed').textContent=red;if($('networkMissing'))$('networkMissing').textContent=missing;if($('networkGreenPct'))$('networkGreenPct').textContent=pct(green);if($('networkYellowPct'))$('networkYellowPct').textContent=pct(yellow);if($('networkRedPct'))$('networkRedPct').textContent=pct(red);if($('networkMissingPct'))$('networkMissingPct').textContent=pct(missing);const dot=$('networkAvgDot');if(dot)dot.className='network-led-dot '+(!Number.isFinite(avg)?'blue':avg>=95?'green':avg>=80?'yellow':'red')}
-function eligibleHistory(){const region=allowed('historyRegion'),m=$('historyMonth')?.value,y=$('historyYear')?.value,s=$('historyStore')?.value;return(window.ADERENCIA_HISTORY?.load?.()||[]).filter(r=>region.has(r.store)&&(m==='all'||+r.month===+m)&&(y==='all'||+r.year===+y)&&(s==='all'||r.store===s)&&!isInactive(r.store)&&!isException(r.store,r.month,r.year))}
-function decorateHistory(){if(!$('historyBars'))return;const rows=eligibleHistory(),map=new Map();for(const rr of rows){const v=score(rr);if(!Number.isFinite(v))continue;if(!map.has(rr.store))map.set(rr.store,[]);map.get(rr.store).push(v)}const list=[...map].map(([store,a])=>({store,value:a.reduce((x,z)=>x+z,0)/a.length})).sort((a,b)=>b.value-a.value),vals=list.map(x=>x.value);if($('histStores'))$('histStores').textContent=list.length;if($('histAverage'))$('histAverage').textContent=vals.length?fmt(vals.reduce((a,b)=>a+b,0)/vals.length):'—';if($('histGood'))$('histGood').textContent=vals.filter(v=>v>=95).length;if($('histCritical'))$('histCritical').textContent=vals.filter(v=>v<80).length;$('historyBars').innerHTML=list.length?list.map(x=>`<div class="history-row"><span class="history-store-label">${x.store} - ${(window.ADERENCIA_STORES||{})[x.store]||''}</span><div class="history-bar-track"><div class="history-bar-fill ${x.value>=95?'good':x.value>=80?'attention':'critical'}" style="width:${Math.max(0,Math.min(100,x.value))}%"></div></div><strong>${fmt(x.value)}</strong></div>`).join(''):'<p class="empty-history">Nenhum resultado elegível para o filtro selecionado.</p>';decorateTrend()}
-function decorateTrend(){const box=$('historyTrendChart');if(!box)return;const region=allowed('historyRegion'),s=$('historyStore')?.value,y=$('historyYear')?.value,all=(window.ADERENCIA_HISTORY?.load?.()||[]).filter(r=>region.has(r.store)&&!isInactive(r.store)&&!isException(r.store,r.month,r.year)&&(y==='all'||+r.year===+y)&&(s==='all'||r.store===s));let series;if(s&&s!=='all')series=all.sort((a,b)=>a.year-b.year||a.month-b.month).map(r=>({label:`${String(r.month).padStart(2,'0')}/${String(r.year).slice(-2)}`,value:score(r)})).filter(x=>Number.isFinite(x.value));else{const g=new Map();for(const r of all){const v=score(r);if(!Number.isFinite(v))continue;const k=`${r.year}-${String(r.month).padStart(2,'0')}`;if(!g.has(k))g.set(k,[]);g.get(k).push(v)}series=[...g].sort((a,b)=>a[0].localeCompare(b[0])).map(([k,a])=>({label:`${k.slice(5)}/${k.slice(2,4)}`,value:a.reduce((x,z)=>x+z,0)/a.length}))}box.innerHTML=series.length?series.map(x=>`<div class="trend-column"><span class="trend-value">${fmt(x.value)}</span><div class="trend-bar ${x.value>=95?'good':x.value>=80?'attention':'critical'}" style="height:${Math.max(2,Math.min(100,x.value))}%"></div><span class="trend-label">${x.label}</span></div>`).join(''):'<p class="empty-history">Sem dados elegíveis para a tendência.</p>'}
-function decorateSemester(){const y=+$('semesterYear')?.value,s=$('semesterStore')?.value;if(!y||!$('semesterTable'))return;const region=allowed('semesterRegion'),stores=(s&&s!=='all'?[s]:[...region]).filter(x=>!isInactive(x)),all=(window.ADERENCIA_HISTORY?.load?.()||[]).filter(r=>+r.year===y&&region.has(r.store)&&!isInactive(r.store)&&!isException(r.store,r.month,r.year)&&(s==='all'||r.store===s)),values=(months,store=null)=>all.filter(r=>(!store||r.store===store)&&months.includes(+r.month)).map(score).filter(Number.isFinite),avg=a=>a.length?a.reduce((x,z)=>x+z,0)/a.length:null,a1=avg(values([1,2,3,4,5,6])),a2=avg(values([7,8,9,10,11,12])),delta=Number.isFinite(a1)&&Number.isFinite(a2)?a2-a1:null;if($('sem1Avg'))$('sem1Avg').textContent=fmt(a1);if($('sem2Avg'))$('sem2Avg').textContent=fmt(a2);if($('semDelta'))$('semDelta').textContent=Number.isFinite(delta)?`${delta>=0?'+':''}${delta.toFixed(2).replace('.',',')} p.p.`:'—';if($('semDeltaText'))$('semDeltaText').textContent=Number.isFinite(delta)?(delta>0?'Melhora no 2º semestre':delta<0?'Queda no 2º semestre':'Estável'):'Dados insuficientes';$('semesterTable').innerHTML='<div class="semester-row header"><span>Loja</span><span>1º sem.</span><span>2º sem.</span><span>Variação</span></div>'+stores.map(st=>{const a=avg(values([1,2,3,4,5,6],st)),b=avg(values([7,8,9,10,11,12],st)),d=Number.isFinite(a)&&Number.isFinite(b)?b-a:null;return`<div class="semester-row"><span>${st} - ${(window.ADERENCIA_STORES||{})[st]||''}</span><span>${fmt(a)}</span><span>${fmt(b)}</span><span>${Number.isFinite(d)?`${d>=0?'+':''}${d.toFixed(2).replace('.',',')} p.p.`:'—'}</span></div>`}).join('')}
+
+function divergenceMap(month,year){
+  const map=new Map();
+  try{
+    const rows=JSON.parse(localStorage.getItem(DIVERGENCE_KEY)||'[]');
+    if(!Array.isArray(rows))return map;
+    for(const row of rows){
+      if(+row.month!==+month||+row.year!==+year||!row.store)continue;
+      let dev=0,nc=0;
+      for(const o of row.occurrences||[]){
+        if(o.type==='DESVIO_ENTRADA_GT_90')dev++;
+        else if(o.type==='FOLGA_AUSENCIA_COM_PONTO')nc++;
+      }
+      map.set(String(row.store),{dev,nc});
+    }
+  }catch(e){console.warn('Não foi possível ler o detalhamento de divergências',e)}
+  return map;
+}
+function appendInconsistencySummary(card,store,hasResult,details){
+  if(!hasResult)return;
+  const el=document.createElement('small');
+  el.className='op-inconsistency-summary';
+  const c=details.get(store);
+  el.textContent=c?`${c.dev} inconsistências >90min / ${c.nc} não conformidades em folgas`:'Detalhamento de inconsistências indisponível';
+  card.appendChild(el);
+}
+
+function decorateMonitor(){
+  const grid=$('monitorGrid');
+  if(!grid)return;
+  const{month,year}=monitorPeriod(),rows=window.ADERENCIA_HISTORY?.load?.()||[],by=new Map(rows.filter(r=>+r.month===month&&+r.year===year).map(r=>[r.store,r])),okStores=allowed('monitorRegion'),details=divergenceMap(month,year);
+  let withData=0,g=0,a=0,r=0,eligible=0;
+  for(const card of grid.querySelectorAll('.monitor-card')){
+    const store=card.querySelector('strong')?.textContent?.trim();
+    if(!store)continue;
+    card.hidden=!okStores.has(store);
+    if(card.hidden)continue;
+    card.querySelectorAll('.op-badges,.op-inconsistency-summary').forEach(x=>x.remove());
+    const fl=get(store,month,year),record=by.get(store),value=score(record),box=document.createElement('div');
+    box.className='op-badges';
+    card.onclick=ev=>{if(!ev.target.closest('button'))openModal(store,month,year)};
+    card.classList.remove('green','yellow','red','nodata','inactive','exception');
+
+    if(isInactive(store)){
+      card.dataset.operationalStatus='inactive';card.classList.add('inactive');
+      const b=card.querySelector('b');if(b)b.textContent='INATIVA';
+      box.innerHTML=badge('INATIVA','inactive');card.appendChild(box);continue;
+    }
+    if(fl.exception){
+      card.dataset.operationalStatus='exception';card.classList.add('exception');
+      const b=card.querySelector('b');if(b)b.textContent='EXCEÇÃO';
+      box.innerHTML=badge('EXCEÇÃO','exception',fl.exceptionReason);
+      if(fl.late)box.innerHTML+=badge('ENVIO APÓS O PRAZO','late');
+      if(fl.certified)box.innerHTML+=badge('CERTIFICADO POR AMOSTRAGEM','certified');
+      card.appendChild(box);continue;
+    }
+
+    eligible++;card.dataset.operationalStatus='normal';
+    const cls=cardClass(value);card.classList.add(cls);
+    const b=card.querySelector('b');if(b)b.textContent=fmt(value);
+    if(Number.isFinite(value)){withData++;if(value>=95)g++;else if(value>=80)a++;else r++}
+    if(fl.late)box.innerHTML+=badge('ENVIO APÓS O PRAZO','late');
+    if(fl.certified)box.innerHTML+=badge('CERTIFICADO POR AMOSTRAGEM','certified');
+    if(box.innerHTML)card.appendChild(box);
+    appendInconsistencySummary(card,store,!!record,details);
+  }
+  if($('monWithData'))$('monWithData').textContent=withData;
+  if($('monGreen'))$('monGreen').textContent=g;
+  if($('monYellow'))$('monYellow').textContent=a;
+  if($('monRed'))$('monRed').textContent=r;
+  if($('monMissing'))$('monMissing').textContent=Math.max(0,eligible-withData);
+}
+
+function decorateNetwork(){
+  const m=+$('networkLedMonth')?.value,y=+$('networkLedYear')?.value;
+  if(!m||!y||!$('networkLedPanel'))return;
+  const stores=Object.keys(window.ADERENCIA_STORES||{}),rows=window.ADERENCIA_HISTORY?.load?.()||[],by=new Map(rows.filter(r=>+r.month===m&&+r.year===y).map(r=>[r.store,r]));
+  let green=0,yellow=0,red=0,eligible=0;
+  const values=[];
+  for(const s of stores){
+    if(isInactive(s)||isException(s,m,y))continue;
+    eligible++;
+    const v=score(by.get(s));
+    if(!Number.isFinite(v))continue;
+    values.push(v);
+    if(v>=95)green++;else if(v>=80)yellow++;else red++;
+  }
+  const avg=values.length?values.reduce((a,b)=>a+b,0)/values.length:NaN,missing=Math.max(0,eligible-values.length),pct=n=>eligible?`${Math.round(n/eligible*100)}% da base elegível`:'0% da base elegível';
+  if($('networkAvg'))$('networkAvg').textContent=fmt(avg);
+  if($('networkCoverage'))$('networkCoverage').textContent=`${values.length} de ${eligible} lojas elegíveis com resultado`;
+  if($('networkGreen'))$('networkGreen').textContent=green;
+  if($('networkYellow'))$('networkYellow').textContent=yellow;
+  if($('networkRed'))$('networkRed').textContent=red;
+  if($('networkMissing'))$('networkMissing').textContent=missing;
+  if($('networkGreenPct'))$('networkGreenPct').textContent=pct(green);
+  if($('networkYellowPct'))$('networkYellowPct').textContent=pct(yellow);
+  if($('networkRedPct'))$('networkRedPct').textContent=pct(red);
+  if($('networkMissingPct'))$('networkMissingPct').textContent=pct(missing);
+  const dot=$('networkAvgDot');if(dot)dot.className='network-led-dot '+(!Number.isFinite(avg)?'blue':avg>=95?'green':avg>=80?'yellow':'red');
+}
+
+function eligibleHistory(){
+  const region=allowed('historyRegion'),m=$('historyMonth')?.value,y=$('historyYear')?.value,s=$('historyStore')?.value;
+  return(window.ADERENCIA_HISTORY?.load?.()||[]).filter(r=>region.has(r.store)&&(m==='all'||+r.month===+m)&&(y==='all'||+r.year===+y)&&(s==='all'||r.store===s)&&!isInactive(r.store)&&!isException(r.store,r.month,r.year));
+}
+function decorateHistory(){
+  if(!$('historyBars'))return;
+  const rows=eligibleHistory(),map=new Map();
+  for(const rr of rows){
+    const v=score(rr);if(!Number.isFinite(v))continue;
+    if(!map.has(rr.store))map.set(rr.store,[]);
+    map.get(rr.store).push(v);
+  }
+  const list=[...map].map(([store,a])=>({store,value:a.reduce((x,z)=>x+z,0)/a.length})).sort((a,b)=>b.value-a.value),vals=list.map(x=>x.value);
+  if($('histStores'))$('histStores').textContent=list.length;
+  if($('histAverage'))$('histAverage').textContent=vals.length?fmt(vals.reduce((a,b)=>a+b,0)/vals.length):'—';
+  if($('histGood'))$('histGood').textContent=vals.filter(v=>v>=95).length;
+  if($('histCritical'))$('histCritical').textContent=vals.filter(v=>v<80).length;
+  $('historyBars').innerHTML=list.length?list.map(x=>`<div class="history-row"><span class="history-store-label">${x.store} - ${(window.ADERENCIA_STORES||{})[x.store]||''}</span><div class="history-bar-track"><div class="history-bar-fill ${x.value>=95?'good':x.value>=80?'attention':'critical'}" style="width:${Math.max(0,Math.min(100,x.value))}%"></div></div><strong>${fmt(x.value)}</strong></div>`).join(''):'<p class="empty-history">Nenhum resultado elegível para o filtro selecionado.</p>';
+  decorateTrend();
+}
+function decorateTrend(){
+  const box=$('historyTrendChart');if(!box)return;
+  const region=allowed('historyRegion'),s=$('historyStore')?.value,y=$('historyYear')?.value,all=(window.ADERENCIA_HISTORY?.load?.()||[]).filter(r=>region.has(r.store)&&!isInactive(r.store)&&!isException(r.store,r.month,r.year)&&(y==='all'||+r.year===+y)&&(s==='all'||r.store===s));
+  let series;
+  if(s&&s!=='all')series=all.sort((a,b)=>a.year-b.year||a.month-b.month).map(r=>({label:`${String(r.month).padStart(2,'0')}/${String(r.year).slice(-2)}`,value:score(r),adjustment:window.ADERENCIA_HISTORY?.adjustmentPercent?.(r)||0})).filter(x=>Number.isFinite(x.value));
+  else{
+    const g=new Map();
+    for(const r of all){
+      const v=score(r);if(!Number.isFinite(v))continue;
+      const k=`${r.year}-${String(r.month).padStart(2,'0')}`;
+      if(!g.has(k))g.set(k,[]);
+      g.get(k).push(v);
+    }
+    series=[...g].sort((a,b)=>a[0].localeCompare(b[0])).map(([k,a])=>({label:`${k.slice(5)}/${k.slice(2,4)}`,value:a.reduce((x,z)=>x+z,0)/a.length,adjustment:0}));
+  }
+  box.innerHTML=series.length?series.map(x=>`<div class="trend-column"><span class="trend-value">${fmt(x.value)}${x.adjustment?` ★ +${x.adjustment}%`:''}</span><div class="trend-bar ${x.value>=95?'good':x.value>=80?'attention':'critical'}" style="height:${Math.max(2,Math.min(100,x.value))}%"></div><span class="trend-label">${x.label}</span></div>`).join(''):'<p class="empty-history">Sem dados elegíveis para a tendência.</p>';
+}
+function decorateSemester(){
+  const y=+$('semesterYear')?.value,s=$('semesterStore')?.value;if(!y||!$('semesterTable'))return;
+  const region=allowed('semesterRegion'),stores=(s&&s!=='all'?[s]:[...region]).filter(x=>!isInactive(x)),all=(window.ADERENCIA_HISTORY?.load?.()||[]).filter(r=>+r.year===y&&region.has(r.store)&&!isInactive(r.store)&&!isException(r.store,r.month,r.year)&&(s==='all'||r.store===s)),values=(months,store=null)=>all.filter(r=>(!store||r.store===store)&&months.includes(+r.month)).map(score).filter(Number.isFinite),avg=a=>a.length?a.reduce((x,z)=>x+z,0)/a.length:null,a1=avg(values([1,2,3,4,5,6])),a2=avg(values([7,8,9,10,11,12])),delta=Number.isFinite(a1)&&Number.isFinite(a2)?a2-a1:null;
+  if($('sem1Avg'))$('sem1Avg').textContent=fmt(a1);
+  if($('sem2Avg'))$('sem2Avg').textContent=fmt(a2);
+  if($('semDelta'))$('semDelta').textContent=Number.isFinite(delta)?`${delta>=0?'+':''}${delta.toFixed(2).replace('.',',')} p.p.`:'—';
+  if($('semDeltaText'))$('semDeltaText').textContent=Number.isFinite(delta)?(delta>0?'Melhora no 2º semestre':delta<0?'Queda no 2º semestre':'Estável'):'Dados insuficientes';
+  $('semesterTable').innerHTML='<div class="semester-row header"><span>Loja</span><span>1º sem.</span><span>2º sem.</span><span>Variação</span></div>'+stores.map(st=>{
+    const a=avg(values([1,2,3,4,5,6],st)),b=avg(values([7,8,9,10,11,12],st)),d=Number.isFinite(a)&&Number.isFinite(b)?b-a:null;
+    return`<div class="semester-row"><span>${st} - ${(window.ADERENCIA_STORES||{})[st]||''}</span><span>${fmt(a)}</span><span>${fmt(b)}</span><span>${Number.isFinite(d)?`${d>=0?'+':''}${d.toFixed(2).replace('.',',')} p.p.`:'—'}</span></div>`;
+  }).join('');
+}
 function refreshAll(){clearTimeout(refreshAll.t);refreshAll.t=setTimeout(()=>{decorateMonitor();decorateNetwork();decorateHistory();decorateSemester()},35)}
-function injectStyles(){if($('opFlagsStyles'))return;const s=document.createElement('style');s.id='opFlagsStyles';s.textContent='.op-badges{grid-column:1/-1;display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}.op-badge{display:inline-flex;align-items:center;border-radius:999px;padding:2px 6px;font-size:7px;font-weight:800;letter-spacing:.03em;line-height:1.35}.op-badge.late{background:#fee2e2;color:#b42318;border:1px solid #fecaca}.op-badge.certified{background:#dcfce7;color:#15803d;border:1px solid #bbf7d0}.op-badge.exception{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}.op-badge.inactive{background:#e5e7eb;color:#475569;border:1px solid #cbd5e1}.monitor-card.inactive{border-color:#cbd5e1!important;background:#f8fafc!important;opacity:.8}.monitor-card.inactive .monitor-light{background:#94a3b8!important}.monitor-card.exception{border-color:#60a5fa!important;background:#eff6ff!important}.monitor-card.exception .monitor-light{background:#3b82f6!important}.monitor-card{cursor:pointer}.op-form{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin:12px 0}.op-form label{font-size:10px;font-weight:700}.op-form select,.op-form textarea{width:100%;margin-top:4px}.op-form textarea{min-height:66px;resize:vertical}.op-checks{display:grid;gap:8px;margin:10px 0}.op-checks label{display:flex;gap:8px;align-items:flex-start;font-size:11px;font-weight:700}.op-checks small{display:block;color:#718096;font-weight:400;margin-top:2px}.op-inactive-note{background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:9px;font-size:10px;color:#475569}@media(max-width:680px){.op-form{grid-template-columns:1fr}}';document.head.appendChild(s)}
+
+function injectStyles(){
+  if($('opFlagsStyles'))return;
+  const s=document.createElement('style');s.id='opFlagsStyles';
+  s.textContent='.op-badges{grid-column:1/-1;display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}.op-inconsistency-summary{grid-column:1/-1;display:block;color:#94a3b8;font-size:7.5px;line-height:1.25;margin-top:2px;font-weight:600}.op-badge{display:inline-flex;align-items:center;border-radius:999px;padding:2px 6px;font-size:7px;font-weight:800;letter-spacing:.03em;line-height:1.35}.op-badge.late{background:#fee2e2;color:#b42318;border:1px solid #fecaca}.op-badge.certified{background:#dcfce7;color:#15803d;border:1px solid #bbf7d0}.op-badge.exception{background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe}.op-badge.inactive{background:#e5e7eb;color:#475569;border:1px solid #cbd5e1}.monitor-card.inactive{border-color:#cbd5e1!important;background:#f8fafc!important;opacity:.8}.monitor-card.inactive .monitor-light{background:#94a3b8!important}.monitor-card.exception{border-color:#60a5fa!important;background:#eff6ff!important}.monitor-card.exception .monitor-light{background:#3b82f6!important}.monitor-card{cursor:pointer}.op-form{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin:12px 0}.op-form label{font-size:10px;font-weight:700}.op-form select,.op-form textarea{width:100%;margin-top:4px}.op-form textarea{min-height:66px;resize:vertical}.op-checks{display:grid;gap:8px;margin:10px 0}.op-checks label{display:flex;gap:8px;align-items:flex-start;font-size:11px;font-weight:700}.op-checks small{display:block;color:#718096;font-weight:400;margin-top:2px}.op-inactive-note{background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;padding:9px;font-size:10px;color:#475569}@media(max-width:680px){.op-form{grid-template-columns:1fr}}';
+  document.head.appendChild(s);
+}
 function storeOptions(){return Object.keys(window.ADERENCIA_STORES||{}).sort().map(s=>`<option value="${s}">${s} - ${(window.ADERENCIA_STORES||{})[s]}${isInactive(s)?' • INATIVA':''}</option>`).join('')}
-function years(){const n=new Date().getFullYear(),x=new Set([n-1,n,n+1,2026]);(window.ADERENCIA_HISTORY?.load?.()||[]).forEach(r=>x.add(+r.year));return[...x].filter(Number.isFinite).sort((a,b)=>b-a)}
-function loadForm(){const s=$('opStore').value,m=+$('opMonth').value,y=+$('opYear').value,f=get(s,m,y),inactive=isInactive(s);$('opException').checked=!!f.exception;$('opLate').checked=!!f.late;$('opCertified').checked=!!f.certified;$('opReason').value=f.exceptionReason||'';$('opException').disabled=inactive;$('opLate').disabled=inactive;$('opCertified').disabled=inactive;$('opReason').disabled=inactive||!f.exception;$('opInactiveNote').hidden=!inactive}
-function openModal(store,month,year){const m=$('operationalFlagsModal');if(!m)return;$('opStore').innerHTML=storeOptions();$('opYear').innerHTML=years().map(y=>`<option>${y}</option>`).join('');$('opMonth').innerHTML=MONTHS.map((x,i)=>`<option value="${i+1}">${x}</option>`).join('');$('opStore').value=store&&[...$('opStore').options].some(o=>o.value===store)?store:'ML01';$('opMonth').value=String(month||new Date().getMonth()+1);$('opYear').value=String(year||new Date().getFullYear());loadForm();m.classList.remove('hidden')}
-function injectUI(){injectStyles();const actions=document.querySelector('.portable-db-actions');if(actions&&!$('operationalFlagsBtn')){const b=document.createElement('button');b.id='operationalFlagsBtn';b.className='secondary';b.type='button';b.textContent='Tratativas';actions.appendChild(b);b.addEventListener('click',()=>{const p=monitorPeriod();openModal(null,p.month,p.year)})}if(!$('operationalFlagsModal')){const m=document.createElement('div');m.id='operationalFlagsModal';m.className='modal-backdrop hidden';m.innerHTML=`<div class="modal-card" style="max-width:700px"><h3>Tratativas operacionais</h3><p>Registre uma condição por loja e competência. Selos não alteram a nota; exceções retiram a competência do denominador.</p><div class="op-form"><label>Loja<select id="opStore"></select></label><label>Mês<select id="opMonth"></select></label><label>Ano<select id="opYear"></select></label></div><div id="opInactiveNote" class="op-inactive-note" hidden>ML04 é uma loja permanentemente inativa. A aplicação não permite atribuir aderência nem tratativas mensais a ela.</div><div class="op-checks"><label><input id="opException" type="checkbox"><span>Exceção de aderência<small>Não conta como sem envio nem entra na média da rede.</small></span></label><label><input id="opLate" type="checkbox"><span>Envio após o prazo<small>Aplica selo vermelho, sem reduzir a nota.</small></span></label><label><input id="opCertified" type="checkbox"><span>Certificação por amostragem<small>Aplica selo verde após sua conferência manual.</small></span></label></div><label style="font-size:10px;font-weight:700">Justificativa da exceção<textarea id="opReason" placeholder="Ex.: unidade sem atividade devido a sinistro..."></textarea></label><div class="modal-actions"><button id="opClear" class="danger-outline" type="button">Limpar tratativas</button><button id="opClose" class="secondary" type="button">Cancelar</button><button id="opSave" type="button">Salvar</button></div></div>`;document.body.appendChild(m);['opStore','opMonth','opYear'].forEach(id=>$(id).addEventListener('change',loadForm));$('opException').addEventListener('change',()=>{$('opReason').disabled=!$('opException').checked});$('opClose').onclick=()=>m.classList.add('hidden');$('opSave').onclick=()=>{const v={store:$('opStore').value,month:+$('opMonth').value,year:+$('opYear').value,exception:$('opException').checked,exceptionReason:$('opReason').value,late:$('opLate').checked,certified:$('opCertified').checked};if(isInactive(v.store))return alert('ML04 é permanentemente inativa e não aceita lançamentos.');if(v.exception&&!v.exceptionReason.trim())return alert('Informe a justificativa da exceção.');set(v);m.classList.add('hidden')};$('opClear').onclick=()=>{const s=$('opStore').value,mn=+$('opMonth').value,y=+$('opYear').value;if(isInactive(s))return;set({store:s,month:mn,year:y});loadForm()}}$('saveHistoryBtn')?.addEventListener('click',e=>{const store=(String($('resultStore')?.textContent||$('metaStore')?.textContent||'').match(/ML\d{2}/)||[])[0];if(store&&isInactive(store)){e.preventDefault();e.stopImmediatePropagation();alert('ML04 é permanentemente inativa. Resultado não pode ser salvo para esta loja.')}},true);const grid=$('monitorGrid');if(grid){const obs=new MutationObserver(ms=>{if(ms.some(m=>m.target===grid))refreshAll()});obs.observe(grid,{childList:true,subtree:false})}refreshAll()}
-seed();window.ADERENCIA_OPERATIONAL_FLAGS={version:VERSION,key:KEY,get,set,load:read,isInactive,isException,score,refresh:refreshAll};document.addEventListener('DOMContentLoaded',injectUI);['aderencia:historychange','aderencia:storeschange','aderencia:portableloaded'].forEach(e=>window.addEventListener(e,refreshAll));window.addEventListener('aderencia:operationalflagschange',refreshAll);document.addEventListener('change',e=>{if(['monitorMonth','monitorYear','monitorRegion','historyMonth','historyYear','historyStore','historyRegion','semesterYear','semesterStore','semesterRegion','networkLedMonth','networkLedYear'].includes(e.target?.id))refreshAll()});
+function years(){
+  const n=new Date().getFullYear(),x=new Set([n-1,n,n+1,2026]);
+  (window.ADERENCIA_HISTORY?.load?.()||[]).forEach(r=>x.add(+r.year));
+  return[...x].filter(Number.isFinite).sort((a,b)=>b-a);
+}
+function loadForm(){
+  const s=$('opStore').value,m=+$('opMonth').value,y=+$('opYear').value,f=get(s,m,y),inactive=isInactive(s);
+  $('opException').checked=!!f.exception;$('opLate').checked=!!f.late;$('opCertified').checked=!!f.certified;$('opReason').value=f.exceptionReason||'';
+  $('opException').disabled=inactive;$('opLate').disabled=inactive;$('opCertified').disabled=inactive;$('opReason').disabled=inactive||!f.exception;$('opInactiveNote').hidden=!inactive;
+}
+function openModal(store,month,year){
+  const m=$('operationalFlagsModal');if(!m)return;
+  $('opStore').innerHTML=storeOptions();$('opYear').innerHTML=years().map(y=>`<option>${y}</option>`).join('');$('opMonth').innerHTML=MONTHS.map((x,i)=>`<option value="${i+1}">${x}</option>`).join('');
+  $('opStore').value=store&&[...$('opStore').options].some(o=>o.value===store)?store:'ML01';$('opMonth').value=String(month||new Date().getMonth()+1);$('opYear').value=String(year||new Date().getFullYear());
+  loadForm();m.classList.remove('hidden');
+}
+function injectUI(){
+  injectStyles();
+  const actions=document.querySelector('.portable-db-actions');
+  if(actions&&!$('operationalFlagsBtn')){
+    const b=document.createElement('button');b.id='operationalFlagsBtn';b.className='secondary';b.type='button';b.textContent='Tratativas';actions.appendChild(b);
+    b.addEventListener('click',()=>{const p=monitorPeriod();openModal(null,p.month,p.year)});
+  }
+  if(!$('operationalFlagsModal')){
+    const m=document.createElement('div');m.id='operationalFlagsModal';m.className='modal-backdrop hidden';
+    m.innerHTML=`<div class="modal-card" style="max-width:700px"><h3>Tratativas operacionais</h3><p>Registre uma condição por loja e competência. Selos não alteram a nota; exceções retiram a competência do denominador.</p><div class="op-form"><label>Loja<select id="opStore"></select></label><label>Mês<select id="opMonth"></select></label><label>Ano<select id="opYear"></select></label></div><div id="opInactiveNote" class="op-inactive-note" hidden>ML04 é uma loja permanentemente inativa. A aplicação não permite atribuir aderência nem tratativas mensais a ela.</div><div class="op-checks"><label><input id="opException" type="checkbox"><span>Exceção de aderência<small>Não conta como sem envio nem entra na média da rede.</small></span></label><label><input id="opLate" type="checkbox"><span>Envio após o prazo<small>Aplica selo vermelho, sem reduzir a nota.</small></span></label><label><input id="opCertified" type="checkbox"><span>Certificação por amostragem<small>Aplica selo verde após sua conferência manual.</small></span></label></div><label style="font-size:10px;font-weight:700">Justificativa da exceção<textarea id="opReason" placeholder="Ex.: unidade sem atividade devido a sinistro..."></textarea></label><div class="modal-actions"><button id="opClear" class="danger-outline" type="button">Limpar tratativas</button><button id="opClose" class="secondary" type="button">Cancelar</button><button id="opSave" type="button">Salvar</button></div></div>`;
+    document.body.appendChild(m);
+    ['opStore','opMonth','opYear'].forEach(id=>$(id).addEventListener('change',loadForm));
+    $('opException').addEventListener('change',()=>{$('opReason').disabled=!$('opException').checked});
+    $('opClose').onclick=()=>m.classList.add('hidden');
+    $('opSave').onclick=()=>{
+      const v={store:$('opStore').value,month:+$('opMonth').value,year:+$('opYear').value,exception:$('opException').checked,exceptionReason:$('opReason').value,late:$('opLate').checked,certified:$('opCertified').checked};
+      if(isInactive(v.store))return alert('ML04 é permanentemente inativa e não aceita lançamentos.');
+      if(v.exception&&!v.exceptionReason.trim())return alert('Informe a justificativa da exceção.');
+      set(v);m.classList.add('hidden');
+    };
+    $('opClear').onclick=()=>{const s=$('opStore').value,mn=+$('opMonth').value,y=+$('opYear').value;if(isInactive(s))return;set({store:s,month:mn,year:y});loadForm()};
+  }
+  $('saveHistoryBtn')?.addEventListener('click',e=>{
+    const store=(String($('resultStore')?.textContent||$('metaStore')?.textContent||'').match(/ML\d{2}/)||[])[0];
+    if(store&&isInactive(store)){e.preventDefault();e.stopImmediatePropagation();alert('ML04 é permanentemente inativa. Resultado não pode ser salvo para esta loja.')}
+  },true);
+  const grid=$('monitorGrid');
+  if(grid){
+    const obs=new MutationObserver(ms=>{if(ms.some(m=>m.target===grid))refreshAll()});
+    obs.observe(grid,{childList:true,subtree:false});
+  }
+  refreshAll();
+}
+
+seed();
+window.ADERENCIA_OPERATIONAL_FLAGS={version:VERSION,key:KEY,get,set,load:read,isInactive,isException,score,refresh:refreshAll};
+document.addEventListener('DOMContentLoaded',injectUI);
+['aderencia:historychange','aderencia:storeschange','aderencia:portableloaded','aderencia:detailcaptured'].forEach(e=>window.addEventListener(e,refreshAll));
+window.addEventListener('aderencia:operationalflagschange',refreshAll);
+window.addEventListener('storage',e=>{if(e.key===DIVERGENCE_KEY)refreshAll()});
+document.addEventListener('change',e=>{if(['monitorMonth','monitorYear','monitorRegion','historyMonth','historyYear','historyStore','historyRegion','semesterYear','semesterStore','semesterRegion','networkLedMonth','networkLedYear'].includes(e.target?.id))refreshAll()});
 })();

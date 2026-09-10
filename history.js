@@ -1,60 +1,298 @@
 (function(){
 'use strict';
+
 const $=id=>document.getElementById(id);
 const KEY='aderenciaHistoricoV2';
 const LEGACY='aderenciaHistoricoV1';
 const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const STORES={ML01:'Jundiaí Barão de Jundiaí',ML02:'Várzea Paulista',ML03:'Jundiaí Praça Rui Barbosa',ML04:'Kids (Inativa)',ML05:'Jundiaí Maxi Shopping',ML06:'Campinas Barão de Itapura',ML07:'Itu Centro',ML08:'Campinas Moraes Sales',ML09:'Indaiatuba',ML10:'Capivari',ML11:'Sorocaba Simus',ML12:'Americana',ML13:'Santa Bárbara',ML14:'Piracicaba',ML15:'Limeira',ML16:'Cosmópolis',ML17:'Sorocaba Esplanada',ML18:'Araraquara Av. 36',ML19:'São Carlos',ML20:'Valinhos',ML21:'Sertãozinho',ML22:'Ribeirão Amin Calil',ML23:'Sorocaba Ipanema',ML24:'Ribeirão Independência',ML25:'Sumaré',ML26:'Itapetininga',ML27:'Campinas Shopping',ML28:'Itu Plaza Shopping',ML29:'Mogi Guaçu',ML30:'Araraquara Centro',ML31:'Bauru Duque',ML32:'Bauru Castelo',ML33:'Campinas Amoreiras',ML34:'Jundiaí Multi Modas',ML35:'Campinas Bandeiras',ML36:'Lençóis Paulista',ML37:'Marília',ML38:'Hortolândia',ML39:'Campinas Dom Pedro',ML40:'Leme',ML41:'Botucatu',ML42:'Bauru Shopping',ML43:'Franca',ML44:'Amparo',ML45:'Araras',ML46:'Franca Shopping',ML47:'Paulínia',ML48:'Ribeirão Saudade',ML49:'Botucatu Major',ML50:'Campinas Saudade',ML51:'Itatiba',ML52:'Jaú',ML53:'Pirassununga',ML54:'Araçatuba',ML55:'Jundiaí Pincinato',ML56:'Catanduva',ML57:'Caieiras',ML58:'Salto',ML59:'Avaré',ML60:'Barretos',ML61:'Vinhedo'};
-window.ADERENCIA_STORES=STORES;window.ADERENCIA_MONTHS=MONTHS;
+const ALLOWED_ADJUSTMENTS=new Set([0,10,20,30,40,50]);
+
+window.ADERENCIA_STORES=STORES;
+window.ADERENCIA_MONTHS=MONTHS;
+
 const fmt=v=>Number.isFinite(v)?`${v.toFixed(2).replace('.',',')}%`:'—';
 const pctNumber=v=>{const m=String(v||'').match(/-?\d+(?:[.,]\d+)?/);return m?Number(m[0].replace(',','.')):null};
 const codeLabel=c=>`${c} - ${STORES[c]||'Loja não cadastrada'}`;
-const effective=r=>Math.min(100,Number(r.adherence)*(r.bonus?1.10:1));
+function adjustmentPercent(r){
+  const p=Number(r?.adjustmentPercent);
+  if(ALLOWED_ADJUSTMENTS.has(p))return p;
+  return r?.bonus?10:0;
+}
+const effective=r=>Math.min(100,Number(r.adherence)*(1+adjustmentPercent(r)/100));
 const light=v=>!Number.isFinite(v)?'nodata':v>=95?'green':v>=80?'yellow':'red';
 const rankClass=v=>!Number.isFinite(v)?'nodata':v>=95?'good':v>=80?'attention':'critical';
-function valid(x){return x&&/^ML\d{2}$/.test(String(x.store))&&Number.isInteger(+x.month)&&+x.month>=1&&+x.month<=12&&Number.isInteger(+x.year)&&+x.year>=2000&&+x.year<=2100&&Number.isFinite(+x.adherence)&&+x.adherence>=0&&+x.adherence<=100}
-function normalize(x){return{store:String(x.store),month:+x.month,year:+x.year,adherence:+x.adherence,bonus:!!x.bonus,savedAt:x.savedAt||new Date().toISOString(),bonusAt:x.bonusAt||null,periodStart:x.periodStart||null,periodEnd:x.periodEnd||null,competenceRule:x.competenceRule||null}}
-function dedupe(rows){const map=new Map();rows.filter(valid).map(normalize).forEach(r=>{const k=`${r.store}-${r.year}-${r.month}`,p=map.get(k);if(!p||String(r.savedAt)>String(p.savedAt))map.set(k,r)});return[...map.values()].sort((a,b)=>a.year-b.year||a.month-b.month||a.store.localeCompare(b.store))}
+
+function valid(x){
+  return x&&/^ML\d{2}$/.test(String(x.store))&&Number.isInteger(+x.month)&&+x.month>=1&&+x.month<=12&&Number.isInteger(+x.year)&&+x.year>=2000&&+x.year<=2100&&Number.isFinite(+x.adherence)&&+x.adherence>=0&&+x.adherence<=100;
+}
+function normalize(x){
+  const p=adjustmentPercent(x);
+  return{
+    store:String(x.store),month:+x.month,year:+x.year,adherence:+x.adherence,
+    adjustmentPercent:p,bonus:p>0,
+    savedAt:x.savedAt||new Date().toISOString(),bonusAt:x.bonusAt||null,
+    periodStart:x.periodStart||null,periodEnd:x.periodEnd||null,competenceRule:x.competenceRule||null
+  };
+}
+function dedupe(rows){
+  const map=new Map();
+  rows.filter(valid).map(normalize).forEach(r=>{
+    const k=`${r.store}-${r.year}-${r.month}`,p=map.get(k);
+    if(!p||String(r.savedAt)>String(p.savedAt))map.set(k,r);
+  });
+  return[...map.values()].sort((a,b)=>a.year-b.year||a.month-b.month||a.store.localeCompare(b.store));
+}
 function saveAll(rows){localStorage.setItem(KEY,JSON.stringify(dedupe(rows)))}
-function load(){try{const raw=localStorage.getItem(KEY);if(raw!==null){const x=JSON.parse(raw||'[]');return Array.isArray(x)?dedupe(x):[]}const old=JSON.parse(localStorage.getItem(LEGACY)||'[]');const migrated=Array.isArray(old)?dedupe(old):[];saveAll(migrated);return migrated}catch(e){console.error('Falha ao ler histórico',e);return[]}}
+function load(){
+  try{
+    const raw=localStorage.getItem(KEY);
+    if(raw!==null){
+      const x=JSON.parse(raw||'[]');
+      return Array.isArray(x)?dedupe(x):[];
+    }
+    const old=JSON.parse(localStorage.getItem(LEGACY)||'[]');
+    const migrated=Array.isArray(old)?dedupe(old):[];
+    saveAll(migrated);
+    return migrated;
+  }catch(e){
+    console.error('Falha ao ler histórico',e);
+    return[];
+  }
+}
 function notify(){window.dispatchEvent(new CustomEvent('aderencia:historychange'))}
-window.ADERENCIA_HISTORY={load,saveAll,effective,stores:STORES,months:MONTHS,light,fmt,notify};
-function years(){const n=new Date().getFullYear(),s=new Set([n-2,n-1,n,n+1]);load().forEach(r=>s.add(r.year));return[...s].sort((a,b)=>b-a)}
+window.ADERENCIA_HISTORY={load,saveAll,effective,adjustmentPercent,stores:STORES,months:MONTHS,light,fmt,notify};
+
+function years(){
+  const n=new Date().getFullYear(),s=new Set([n-2,n-1,n,n+1]);
+  load().forEach(r=>s.add(r.year));
+  return[...s].sort((a,b)=>b-a);
+}
 function monthOptions(all=true){return`${all?'<option value="all">Todos os meses</option>':''}${MONTHS.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('')}`}
 function yearOptions(all=true){return`${all?'<option value="all">Todos os anos</option>':''}${years().map(y=>`<option value="${y}">${y}</option>`).join('')}`}
 function storeOptions(all=true){return`${all?'<option value="all">Todas as lojas</option>':''}${Object.keys(STORES).map(k=>`<option value="${k}">${codeLabel(k)}</option>`).join('')}`}
-function setValue(id,value,dispatch=false){const e=$(id);if(!e||value==null)return;const s=String(value);if(![...e.options].some(o=>o.value===s))e.add(new Option(s,s));e.value=s;if(dispatch)e.dispatchEvent(new Event('change',{bubbles:true}))}
-function fillSelects(){const now=new Date();$('saveMonth').innerHTML=monthOptions(false);$('saveYear').innerHTML=yearOptions(false);$('historyMonth').innerHTML=monthOptions(true);$('historyYear').innerHTML=yearOptions(true);$('historyStore').innerHTML=storeOptions(true);$('monitorMonth').innerHTML=monthOptions(false);$('monitorYear').innerHTML=yearOptions(false);$('semesterYear').innerHTML=yearOptions(false);$('semesterStore').innerHTML=storeOptions(true);setValue('saveMonth',now.getMonth()+1);setValue('saveYear',now.getFullYear());setValue('historyMonth',now.getMonth()+1);setValue('historyYear',now.getFullYear());setValue('monitorMonth',now.getMonth()+1);setValue('monitorYear',now.getFullYear());setValue('semesterYear',now.getFullYear());setValue('historyStore','all');setValue('semesterStore','all')}
-function refreshYears(){['saveYear','historyYear','monitorYear','semesterYear'].forEach(id=>{const e=$(id),cur=e.value,allowAll=id==='historyYear';e.innerHTML=yearOptions(allowAll);if([...e.options].some(o=>o.value===cur))e.value=cur})}
-function competenceFromAnalysis(){const c=window.ADERENCIA_COMPETENCE?.fromAnalysis?.();if(c)return c;const t=$('metaPeriod')?.textContent||'',dates=[...t.matchAll(/(\d{2})\/(\d{2})\/(\d{4})/g)];if(!dates.length)return null;const d=dates[0];return{month:+d[2],year:+d[3],periodStart:`${d[3]}-${d[2]}-${d[1]}`,periodEnd:null,source:'fallback-primeira-data'}}
+function setValue(id,value,dispatch=false){
+  const e=$(id);
+  if(!e||value==null)return;
+  const s=String(value);
+  if(![...e.options].some(o=>o.value===s))e.add(new Option(s,s));
+  e.value=s;
+  if(dispatch)e.dispatchEvent(new Event('change',{bubbles:true}));
+}
+function fillSelects(){
+  const now=new Date();
+  $('saveMonth').innerHTML=monthOptions(false);$('saveYear').innerHTML=yearOptions(false);
+  $('historyMonth').innerHTML=monthOptions(true);$('historyYear').innerHTML=yearOptions(true);$('historyStore').innerHTML=storeOptions(true);
+  $('monitorMonth').innerHTML=monthOptions(false);$('monitorYear').innerHTML=yearOptions(false);
+  $('semesterYear').innerHTML=yearOptions(false);$('semesterStore').innerHTML=storeOptions(true);
+  setValue('saveMonth',now.getMonth()+1);setValue('saveYear',now.getFullYear());
+  setValue('historyMonth',now.getMonth()+1);setValue('historyYear',now.getFullYear());
+  setValue('monitorMonth',now.getMonth()+1);setValue('monitorYear',now.getFullYear());
+  setValue('semesterYear',now.getFullYear());setValue('historyStore','all');setValue('semesterStore','all');
+}
+function refreshYears(){
+  ['saveYear','historyYear','monitorYear','semesterYear'].forEach(id=>{
+    const e=$(id),cur=e.value,allowAll=id==='historyYear';
+    e.innerHTML=yearOptions(allowAll);
+    if([...e.options].some(o=>o.value===cur))e.value=cur;
+  });
+}
+function competenceFromAnalysis(){
+  const c=window.ADERENCIA_COMPETENCE?.fromAnalysis?.();
+  if(c)return c;
+  const t=$('metaPeriod')?.textContent||'',dates=[...t.matchAll(/(\d{2})\/(\d{2})\/(\d{4})/g)];
+  if(!dates.length)return null;
+  const d=dates[0];
+  return{month:+d[2],year:+d[3],periodStart:`${d[3]}-${d[2]}-${d[1]}`,periodEnd:null,source:'fallback-primeira-data'};
+}
 function currentStore(){return(String($('resultStore')?.textContent||$('metaStore')?.textContent||'').match(/ML\d{2}/)||[])[0]||null}
 function syncCompetence(){const c=competenceFromAnalysis();if(!c)return;setValue('saveMonth',c.month);setValue('saveYear',c.year)}
-function syncViews(month,year,store){setValue('historyMonth',month);setValue('historyYear',year);if(store)setValue('historyStore',store);setValue('monitorMonth',month);setValue('monitorYear',year);setValue('semesterYear',year);if(store)setValue('semesterStore',store)}
+function syncViews(month,year,store){
+  setValue('historyMonth',month);setValue('historyYear',year);if(store)setValue('historyStore',store);
+  setValue('monitorMonth',month);setValue('monitorYear',year);setValue('semesterYear',year);if(store)setValue('semesterStore',store);
+}
 function resultReady(){return !$('resultCard')?.classList.contains('hidden')&&pctNumber($('resultPercent')?.textContent)!=null}
-function updateAdherenceVisual(){const v=pctNumber($('resultPercent')?.textContent);if(v==null)return;const bar=document.querySelector('.adherence-scale span');if(bar)bar.style.width=`${Math.max(0,Math.min(100,v))}%`;const d=Math.abs(v-90).toFixed(2).replace('.',',');$('adherenceReading').textContent=v>=90?`ADEQUADO • ${d} p.p. acima da referência de 90%`:v>=80?`ATENÇÃO • ${d} p.p. abaixo da referência de 90%`:`CRÍTICO • ${d} p.p. abaixo da referência de 90%`}
-function syncSave(){const ok=resultReady();$('saveHistoryBtn').disabled=!ok;if(ok){syncCompetence();updateAdherenceVisual()}}
+function updateAdherenceVisual(){
+  const v=pctNumber($('resultPercent')?.textContent);
+  if(v==null)return;
+  const bar=document.querySelector('.adherence-scale span');
+  if(bar)bar.style.width=`${Math.max(0,Math.min(100,v))}%`;
+  const d=Math.abs(v-90).toFixed(2).replace('.',',');
+  $('adherenceReading').textContent=v>=90?`ADEQUADO • ${d} p.p. acima da referência de 90%`:v>=80?`ATENÇÃO • ${d} p.p. abaixo da referência de 90%`:`CRÍTICO • ${d} p.p. abaixo da referência de 90%`;
+}
+function syncSave(){
+  const ok=resultReady();
+  $('saveHistoryBtn').disabled=!ok;
+  if(ok){syncCompetence();updateAdherenceVisual()}
+}
+
 const VIEWS=['analysis','history','monitor','semester'];
-function show(name){VIEWS.forEach(v=>{$(`${v}View`).classList.toggle('hidden',v!==name);$(`${v}Tab`).classList.toggle('active',v===name)});if(name==='history')renderHistory();if(name==='monitor')renderMonitor();if(name==='semester')renderSemester()}
+function show(name){
+  VIEWS.forEach(v=>{$(`${v}View`).classList.toggle('hidden',v!==name);$(`${v}Tab`).classList.toggle('active',v===name)});
+  if(name==='history')renderHistory();
+  if(name==='monitor')renderMonitor();
+  if(name==='semester')renderSemester();
+}
 VIEWS.forEach(v=>$(`${v}Tab`)?.addEventListener('click',()=>show(v)));
-$('saveHistoryBtn')?.addEventListener('click',()=>{if(!resultReady())return;const c=competenceFromAnalysis();syncCompetence();const store=currentStore(),adherence=pctNumber($('resultPercent').textContent),month=c?.month||+$('saveMonth').value,year=c?.year||+$('saveYear').value;if(!store||adherence==null||!month||!year)return alert('Não foi possível identificar loja, competência e aderência.');const rows=load(),i=rows.findIndex(r=>r.store===store&&r.month===month&&r.year===year),prev=i>=0?rows[i]:null,row={store,month,year,adherence,bonus:prev?.bonus||false,bonusAt:prev?.bonusAt||null,savedAt:new Date().toISOString(),periodStart:c?.periodStart||prev?.periodStart||null,periodEnd:c?.periodEnd||prev?.periodEnd||null,competenceRule:'POINT_PERIOD_START'};i>=0?rows[i]=row:rows.push(row);saveAll(rows);refreshYears();syncViews(month,year,store);notify();renderHistory();renderMonitor();renderSemester();const b=$('saveHistoryBtn'),old=b.textContent;b.textContent=i>=0?'Resultado atualizado':'Resultado salvo';setTimeout(()=>b.textContent=old,1100)});
-function filterHistory(){const m=$('historyMonth').value,y=$('historyYear').value,s=$('historyStore').value;return load().filter(r=>(m==='all'||r.month===+m)&&(y==='all'||r.year===+y)&&(s==='all'||r.store===s))}
-function aggregate(rows){const map=new Map();rows.forEach(r=>{if(!map.has(r.store))map.set(r.store,[]);map.get(r.store).push(effective(r))});return[...map].map(([store,a])=>({store,value:a.reduce((x,y)=>x+y,0)/a.length,n:a.length})).sort((a,b)=>b.value-a.value)}
-function renderHistory(){const rows=filterHistory(),list=aggregate(rows),vals=list.map(x=>x.value),avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;$('histStores').textContent=list.length;$('histAverage').textContent=fmt(avg);$('histGood').textContent=vals.filter(v=>v>=95).length;$('histCritical').textContent=vals.filter(v=>v<80).length;const m=$('historyMonth').value,y=$('historyYear').value,s=$('historyStore').value;$('historyPeriodLabel').textContent=`${m==='all'?'Todos os meses':MONTHS[+m-1]}${y==='all'?'':` • ${y}`}`;$('historyRankingTitle').textContent=s==='all'?'Aderência por loja':codeLabel(s);$('historyBars').innerHTML=list.length?list.map(x=>`<div class="history-row"><span class="history-store-label" title="${codeLabel(x.store)}">${codeLabel(x.store)}</span><div class="history-bar-track"><div class="history-bar-fill ${rankClass(x.value)}" style="width:${Math.max(0,Math.min(100,x.value))}%"></div></div><strong>${fmt(x.value)}</strong></div>`).join(''):'<p class="empty-history">Nenhum resultado salvo para o filtro selecionado.</p>';renderTrend();syncBonusButton()}
-function renderTrend(){const all=load(),s=$('historyStore').value,y=$('historyYear').value;let series,title;if(s!=='all'){series=all.filter(r=>r.store===s&&(y==='all'||r.year===+y)).sort((a,b)=>a.year-b.year||a.month-b.month).map(r=>({label:`${String(r.month).padStart(2,'0')}/${String(r.year).slice(-2)}`,value:effective(r),bonus:r.bonus}));title=`Tendência • ${codeLabel(s)}`}else{const g=new Map();all.filter(r=>y==='all'||r.year===+y).forEach(r=>{const k=`${r.year}-${String(r.month).padStart(2,'0')}`;if(!g.has(k))g.set(k,[]);g.get(k).push(effective(r))});series=[...g].sort((a,b)=>a[0].localeCompare(b[0])).map(([k,a])=>({label:`${k.slice(5)}/${k.slice(2,4)}`,value:a.reduce((x,z)=>x+z,0)/a.length}));title='Tendência • média da rede'}$('historyTrendTitle').textContent=title;$('historyTrendChart').innerHTML=series.length?series.map(x=>`<div class="trend-column"><span class="trend-value">${fmt(x.value)}${x.bonus?' ★':''}</span><div class="trend-bar ${rankClass(x.value)}" style="height:${Math.max(2,Math.min(100,x.value))}%"></div><span class="trend-label">${x.label}</span></div>`).join(''):'<p class="empty-history">Salve mais competências para visualizar a evolução.</p>'}
+
+$('saveHistoryBtn')?.addEventListener('click',()=>{
+  if(!resultReady())return;
+  const c=competenceFromAnalysis();
+  syncCompetence();
+  const store=currentStore(),adherence=pctNumber($('resultPercent').textContent),month=c?.month||+$('saveMonth').value,year=c?.year||+$('saveYear').value;
+  if(!store||adherence==null||!month||!year)return alert('Não foi possível identificar loja, competência e aderência.');
+  const rows=load(),i=rows.findIndex(r=>r.store===store&&r.month===month&&r.year===year),prev=i>=0?rows[i]:null,p=adjustmentPercent(prev);
+  const row={store,month,year,adherence,adjustmentPercent:p,bonus:p>0,bonusAt:prev?.bonusAt||null,savedAt:new Date().toISOString(),periodStart:c?.periodStart||prev?.periodStart||null,periodEnd:c?.periodEnd||prev?.periodEnd||null,competenceRule:'POINT_PERIOD_START'};
+  i>=0?rows[i]=row:rows.push(row);
+  saveAll(rows);refreshYears();syncViews(month,year,store);notify();renderHistory();renderMonitor();renderSemester();
+  const b=$('saveHistoryBtn'),old=b.textContent;
+  b.textContent=i>=0?'Resultado atualizado':'Resultado salvo';
+  setTimeout(()=>b.textContent=old,1100);
+});
+
+function filterHistory(){
+  const m=$('historyMonth').value,y=$('historyYear').value,s=$('historyStore').value;
+  return load().filter(r=>(m==='all'||r.month===+m)&&(y==='all'||r.year===+y)&&(s==='all'||r.store===s));
+}
+function aggregate(rows){
+  const map=new Map();
+  rows.forEach(r=>{if(!map.has(r.store))map.set(r.store,[]);map.get(r.store).push(effective(r))});
+  return[...map].map(([store,a])=>({store,value:a.reduce((x,y)=>x+y,0)/a.length,n:a.length})).sort((a,b)=>b.value-a.value);
+}
+function renderHistory(){
+  const rows=filterHistory(),list=aggregate(rows),vals=list.map(x=>x.value),avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+  $('histStores').textContent=list.length;$('histAverage').textContent=fmt(avg);$('histGood').textContent=vals.filter(v=>v>=95).length;$('histCritical').textContent=vals.filter(v=>v<80).length;
+  const m=$('historyMonth').value,y=$('historyYear').value,s=$('historyStore').value;
+  $('historyPeriodLabel').textContent=`${m==='all'?'Todos os meses':MONTHS[+m-1]}${y==='all'?'':` • ${y}`}`;
+  $('historyRankingTitle').textContent=s==='all'?'Aderência por loja':codeLabel(s);
+  $('historyBars').innerHTML=list.length?list.map(x=>`<div class="history-row"><span class="history-store-label" title="${codeLabel(x.store)}">${codeLabel(x.store)}</span><div class="history-bar-track"><div class="history-bar-fill ${rankClass(x.value)}" style="width:${Math.max(0,Math.min(100,x.value))}%"></div></div><strong>${fmt(x.value)}</strong></div>`).join(''):'<p class="empty-history">Nenhum resultado salvo para o filtro selecionado.</p>';
+  renderTrend();syncBonusButton();
+}
+function renderTrend(){
+  const all=load(),s=$('historyStore').value,y=$('historyYear').value;
+  let series,title;
+  if(s!=='all'){
+    series=all.filter(r=>r.store===s&&(y==='all'||r.year===+y)).sort((a,b)=>a.year-b.year||a.month-b.month).map(r=>({label:`${String(r.month).padStart(2,'0')}/${String(r.year).slice(-2)}`,value:effective(r),adjustment:adjustmentPercent(r)}));
+    title=`Tendência • ${codeLabel(s)}`;
+  }else{
+    const g=new Map();
+    all.filter(r=>y==='all'||r.year===+y).forEach(r=>{const k=`${r.year}-${String(r.month).padStart(2,'0')}`;if(!g.has(k))g.set(k,[]);g.get(k).push(effective(r))});
+    series=[...g].sort((a,b)=>a[0].localeCompare(b[0])).map(([k,a])=>({label:`${k.slice(5)}/${k.slice(2,4)}`,value:a.reduce((x,z)=>x+z,0)/a.length,adjustment:0}));
+    title='Tendência • média da rede';
+  }
+  $('historyTrendTitle').textContent=title;
+  $('historyTrendChart').innerHTML=series.length?series.map(x=>`<div class="trend-column"><span class="trend-value">${fmt(x.value)}${x.adjustment?` ★ +${x.adjustment}%`:''}</span><div class="trend-bar ${rankClass(x.value)}" style="height:${Math.max(2,Math.min(100,x.value))}%"></div><span class="trend-label">${x.label}</span></div>`).join(''):'<p class="empty-history">Salve mais competências para visualizar a evolução.</p>';
+}
 ['historyMonth','historyYear','historyStore'].forEach(id=>$(id)?.addEventListener('change',renderHistory));
-function renderMonitor(){const m=+$('monitorMonth').value,y=+$('monitorYear').value,by=new Map(load().filter(r=>r.month===m&&r.year===y).map(r=>[r.store,r]));let green=0,yellow=0,red=0;const cards=Object.keys(STORES).map(store=>{const r=by.get(store),v=r?effective(r):NaN,l=light(v);if(l==='green')green++;else if(l==='yellow')yellow++;else if(l==='red')red++;return`<article class="monitor-card ${l}"><div class="monitor-light"></div><div><strong>${store}</strong><span>${STORES[store]}</span></div><b>${Number.isFinite(v)?fmt(v):'—'}</b>${r?.bonus?'<small>★ ajuste +10%</small>':''}</article>`});$('monitorGrid').innerHTML=cards.join('');$('monWithData').textContent=by.size;$('monGreen').textContent=green;$('monYellow').textContent=yellow;$('monRed').textContent=red;$('monMissing').textContent=Math.max(0,Object.keys(STORES).length-by.size)}
+
+function renderMonitor(){
+  const m=+$('monitorMonth').value,y=+$('monitorYear').value,by=new Map(load().filter(r=>r.month===m&&r.year===y).map(r=>[r.store,r]));
+  let green=0,yellow=0,red=0;
+  const cards=Object.keys(STORES).map(store=>{
+    const r=by.get(store),v=r?effective(r):NaN,l=light(v),p=adjustmentPercent(r);
+    if(l==='green')green++;else if(l==='yellow')yellow++;else if(l==='red')red++;
+    return`<article class="monitor-card ${l}"><div class="monitor-light"></div><div><strong>${store}</strong><span>${STORES[store]}</span></div><b>${Number.isFinite(v)?fmt(v):'—'}</b>${p?`<small>★ ajuste +${p}%</small>`:''}</article>`;
+  });
+  $('monitorGrid').innerHTML=cards.join('');
+  $('monWithData').textContent=by.size;$('monGreen').textContent=green;$('monYellow').textContent=yellow;$('monRed').textContent=red;$('monMissing').textContent=Math.max(0,Object.keys(STORES).length-by.size);
+}
 ['monitorMonth','monitorYear'].forEach(id=>$(id)?.addEventListener('change',renderMonitor));
-function semAverage(rows,months){const a=rows.filter(r=>months.includes(r.month)).map(effective);return a.length?a.reduce((x,y)=>x+y,0)/a.length:null}
-function renderSemester(){const y=+$('semesterYear').value,s=$('semesterStore').value,all=load().filter(r=>r.year===y&&(s==='all'||r.store===s)),s1=semAverage(all,[1,2,3,4,5,6]),s2=semAverage(all,[7,8,9,10,11,12]),delta=Number.isFinite(s1)&&Number.isFinite(s2)?s2-s1:null;$('sem1Avg').textContent=fmt(s1);$('sem2Avg').textContent=fmt(s2);$('semDelta').textContent=Number.isFinite(delta)?`${delta>=0?'+':''}${delta.toFixed(2).replace('.',',')} p.p.`:'—';$('semDeltaText').textContent=Number.isFinite(delta)?(delta>0?'Melhora no 2º semestre':delta<0?'Queda no 2º semestre':'Estável'):'Dados insuficientes';$('semesterTitle').textContent=s==='all'?`Comparativo por loja • ${y}`:`${codeLabel(s)} • ${y}`;const stores=s==='all'?Object.keys(STORES):[s];$('semesterTable').innerHTML=`<div class="semester-row header"><span>Loja</span><span>1º sem.</span><span>2º sem.</span><span>Variação</span></div>${stores.map(st=>{const r=all.filter(x=>x.store===st),a=semAverage(r,[1,2,3,4,5,6]),b=semAverage(r,[7,8,9,10,11,12]),d=Number.isFinite(a)&&Number.isFinite(b)?b-a:null;return`<div class="semester-row"><span>${codeLabel(st)}</span><strong class="${rankClass(a)}-text">${fmt(a)}</strong><strong class="${rankClass(b)}-text">${fmt(b)}</strong><strong>${Number.isFinite(d)?`${d>=0?'+':''}${d.toFixed(2).replace('.',',')} p.p.`:'—'}</strong></div>`}).join('')}`}
+
+function semAverage(rows,months){
+  const a=rows.filter(r=>months.includes(r.month)).map(effective);
+  return a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+}
+function renderSemester(){
+  const y=+$('semesterYear').value,s=$('semesterStore').value,all=load().filter(r=>r.year===y&&(s==='all'||r.store===s)),s1=semAverage(all,[1,2,3,4,5,6]),s2=semAverage(all,[7,8,9,10,11,12]),delta=Number.isFinite(s1)&&Number.isFinite(s2)?s2-s1:null;
+  $('sem1Avg').textContent=fmt(s1);$('sem2Avg').textContent=fmt(s2);$('semDelta').textContent=Number.isFinite(delta)?`${delta>=0?'+':''}${delta.toFixed(2).replace('.',',')} p.p.`:'—';
+  $('semDeltaText').textContent=Number.isFinite(delta)?(delta>0?'Melhora no 2º semestre':delta<0?'Queda no 2º semestre':'Estável'):'Dados insuficientes';
+  $('semesterTitle').textContent=s==='all'?`Comparativo por loja • ${y}`:`${codeLabel(s)} • ${y}`;
+  const stores=s==='all'?Object.keys(STORES):[s];
+  $('semesterTable').innerHTML=`<div class="semester-row header"><span>Loja</span><span>1º sem.</span><span>2º sem.</span><span>Variação</span></div>${stores.map(st=>{
+    const r=all.filter(x=>x.store===st),a=semAverage(r,[1,2,3,4,5,6]),b=semAverage(r,[7,8,9,10,11,12]),d=Number.isFinite(a)&&Number.isFinite(b)?b-a:null;
+    return`<div class="semester-row"><span>${codeLabel(st)}</span><strong class="${rankClass(a)}-text">${fmt(a)}</strong><strong class="${rankClass(b)}-text">${fmt(b)}</strong><strong>${Number.isFinite(d)?`${d>=0?'+':''}${d.toFixed(2).replace('.',',')} p.p.`:'—'}</strong></div>`;
+  }).join('')}`;
+}
 ['semesterYear','semesterStore'].forEach(id=>$(id)?.addEventListener('change',renderSemester));
-function modal(title,text,confirmLabel='Confirmar'){return new Promise(resolve=>{const bg=$('confirmModal'),yes=$('modalConfirm'),no=$('modalCancel');$('modalTitle').textContent=title;$('modalText').textContent=text;yes.textContent=confirmLabel;bg.classList.remove('hidden');let doneFlag=false;const done=v=>{if(doneFlag)return;doneFlag=true;bg.classList.add('hidden');yes.onclick=no.onclick=null;document.removeEventListener('keydown',esc);resolve(v)},esc=e=>{if(e.key==='Escape')done(false)};document.addEventListener('keydown',esc);yes.onclick=()=>done(true);no.onclick=()=>done(false);bg.onclick=e=>{if(e.target===bg)done(false)}})}
-$('clearHistoryBtn')?.addEventListener('click',async()=>{if(!load().length)return alert('O histórico já está vazio.');if(await modal('Limpar todo o histórico','Esta ação apaga todos os resultados salvos neste navegador. Faça um backup antes se quiser preservar os testes.','Apagar tudo')){localStorage.setItem(KEY,'[]');localStorage.removeItem(LEGACY);refreshYears();notify();renderHistory();renderMonitor();renderSemester();alert('Histórico limpo.')}});
-function selectedRecord(){const m=$('historyMonth').value,y=$('historyYear').value,s=$('historyStore').value;if(m==='all'||y==='all'||s==='all')return null;return load().find(r=>r.store===s&&r.month===+m&&r.year===+y)||null}
-function syncBonusButton(){const b=$('bonusBtn'),r=selectedRecord();if(!b)return;b.disabled=!r;b.textContent=r?.bonus?'Remover ajuste +10%':'Ajuste eletivo +10%'}
-$('bonusBtn')?.addEventListener('click',async()=>{const r=selectedRecord();if(!r)return alert('Selecione uma loja, um mês e um ano que possuam resultado salvo.');const applied=r.bonus,next=!applied,base=fmt(r.adherence),adjusted=fmt(Math.min(100,r.adherence*1.10)),ok=await modal(next?'Aplicar ajuste eletivo +10%':'Remover ajuste eletivo',next?`${codeLabel(r.store)} • ${MONTHS[r.month-1]}/${r.year}. Resultado-base ${base}; após o ajuste ${adjusted}. O resultado original será preservado.`:`${codeLabel(r.store)} • ${MONTHS[r.month-1]}/${r.year}. O indicador voltará ao resultado-base ${base}.`,next?'Aplicar ajuste':'Remover ajuste');if(!ok)return;const rows=load(),i=rows.findIndex(x=>x.store===r.store&&x.month===r.month&&x.year===r.year);rows[i]={...rows[i],bonus:next,bonusAt:next?new Date().toISOString():null};saveAll(rows);notify();renderHistory();renderMonitor();renderSemester()});
-$('exportHistoryBtn')?.addEventListener('click',()=>{const rows=load(),data=JSON.stringify({version:3,exportedAt:new Date().toISOString(),records:rows},null,2),blob=new Blob([data],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`backup_aderencia_${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)});
-$('importHistoryFile')?.addEventListener('change',async e=>{const f=e.target.files?.[0];if(!f)return;try{const obj=JSON.parse(await f.text()),incoming=(Array.isArray(obj)?obj:obj.records||[]).filter(valid).map(normalize),rows=dedupe([...load(),...incoming]);saveAll(rows);refreshYears();notify();renderHistory();renderMonitor();renderSemester();alert(`${incoming.length} registro(s) restaurado(s)/atualizado(s).`)}catch(err){console.error(err);alert('Backup inválido ou corrompido.')}e.target.value=''});
+
+function modal(title,text,confirmLabel='Confirmar'){
+  return new Promise(resolve=>{
+    const bg=$('confirmModal'),yes=$('modalConfirm'),no=$('modalCancel');
+    $('modalTitle').textContent=title;$('modalText').textContent=text;yes.textContent=confirmLabel;bg.classList.remove('hidden');
+    let doneFlag=false;
+    const done=v=>{if(doneFlag)return;doneFlag=true;bg.classList.add('hidden');yes.onclick=no.onclick=bg.onclick=null;document.removeEventListener('keydown',esc);resolve(v)};
+    const esc=e=>{if(e.key==='Escape')done(false)};
+    document.addEventListener('keydown',esc);yes.onclick=()=>done(true);no.onclick=()=>done(false);bg.onclick=e=>{if(e.target===bg)done(false)};
+  });
+}
+
+$('clearHistoryBtn')?.addEventListener('click',async()=>{
+  if(!load().length)return alert('O histórico já está vazio.');
+  if(await modal('Limpar todo o histórico','Esta ação apaga todos os resultados salvos neste navegador. Faça um backup antes se quiser preservar os testes.','Apagar tudo')){
+    localStorage.setItem(KEY,'[]');localStorage.removeItem(LEGACY);refreshYears();notify();renderHistory();renderMonitor();renderSemester();alert('Histórico limpo.');
+  }
+});
+
+function selectedRecord(){
+  const m=$('historyMonth').value,y=$('historyYear').value,s=$('historyStore').value;
+  if(m==='all'||y==='all'||s==='all')return null;
+  return load().find(r=>r.store===s&&r.month===+m&&r.year===+y)||null;
+}
+function syncBonusButton(){
+  const b=$('bonusBtn'),r=selectedRecord();
+  if(!b)return;
+  b.disabled=!r;
+  const p=adjustmentPercent(r);
+  b.textContent=!r?'Ajuste eletivo':p?`Ajuste eletivo +${p}%`:'Ajuste eletivo';
+}
+function adjustmentModal(r){
+  return new Promise(resolve=>{
+    const bg=$('confirmModal'),yes=$('modalConfirm'),no=$('modalCancel'),text=$('modalText'),base=Number(r.adherence),current=adjustmentPercent(r);
+    $('modalTitle').textContent='Ajuste eletivo';
+    text.innerHTML=`<span>Selecione o percentual a aplicar sobre o resultado-base de <strong>${fmt(base)}</strong>. O resultado original será preservado.</span><label style="display:grid;gap:5px;margin-top:12px;font-size:11px;font-weight:700;color:#475569">Percentual<select id="electiveAdjustmentSelect" style="width:100%;padding:8px;border:1px solid #d7e0e8;border-radius:8px;background:#fff"><option value="0">Sem ajuste</option><option value="10">+10%</option><option value="20">+20%</option><option value="30">+30%</option><option value="40">+40%</option><option value="50">+50%</option></select></label><div id="electiveAdjustmentPreview" style="margin-top:10px;font-size:11px;color:#66768a"></div>`;
+    const select=$('electiveAdjustmentSelect'),preview=$('electiveAdjustmentPreview');
+    select.value=String(current);
+    const update=()=>{const p=+select.value,adjusted=Math.min(100,base*(1+p/100));preview.textContent=p?`Resultado considerado: ${fmt(adjusted)} (+${p}%).`:`Resultado considerado: ${fmt(base)} (sem ajuste).`};
+    update();
+    select.addEventListener('change',update);
+    yes.textContent='Salvar ajuste';bg.classList.remove('hidden');
+    let doneFlag=false;
+    const done=v=>{if(doneFlag)return;doneFlag=true;bg.classList.add('hidden');yes.onclick=no.onclick=bg.onclick=null;document.removeEventListener('keydown',esc);text.textContent='';resolve(v)};
+    const esc=e=>{if(e.key==='Escape')done(null)};
+    document.addEventListener('keydown',esc);
+    yes.onclick=()=>done(+select.value);no.onclick=()=>done(null);bg.onclick=e=>{if(e.target===bg)done(null)};
+  });
+}
+$('bonusBtn')?.addEventListener('click',async()=>{
+  const r=selectedRecord();
+  if(!r)return alert('Selecione uma loja, um mês e um ano que possuam resultado salvo.');
+  const p=await adjustmentModal(r);
+  if(p===null||!ALLOWED_ADJUSTMENTS.has(p))return;
+  const rows=load(),i=rows.findIndex(x=>x.store===r.store&&x.month===r.month&&x.year===r.year);
+  rows[i]={...rows[i],adjustmentPercent:p,bonus:p>0,bonusAt:p?new Date().toISOString():null};
+  saveAll(rows);notify();renderHistory();renderMonitor();renderSemester();
+});
+
+$('exportHistoryBtn')?.addEventListener('click',()=>{
+  const rows=load(),data=JSON.stringify({version:4,exportedAt:new Date().toISOString(),records:rows},null,2),blob=new Blob([data],{type:'application/json'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=`backup_aderencia_${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
+});
+$('importHistoryFile')?.addEventListener('change',async e=>{
+  const f=e.target.files?.[0];if(!f)return;
+  try{
+    const obj=JSON.parse(await f.text()),incoming=(Array.isArray(obj)?obj:obj.records||[]).filter(valid).map(normalize),rows=dedupe([...load(),...incoming]);
+    saveAll(rows);refreshYears();notify();renderHistory();renderMonitor();renderSemester();alert(`${incoming.length} registro(s) restaurado(s)/atualizado(s).`);
+  }catch(err){console.error(err);alert('Backup inválido ou corrompido.')}
+  e.target.value='';
+});
+
 function reactToHistory(){renderHistory();renderMonitor();renderSemester()}
 window.addEventListener('storage',e=>{if(e.key===KEY)reactToHistory()});
-fillSelects();const rc=$('resultCard'),rp=$('resultPercent'),mp=$('metaPeriod');if(rc)new MutationObserver(syncSave).observe(rc,{attributes:true,attributeFilter:['class']});if(rp)new MutationObserver(syncSave).observe(rp,{childList:true,characterData:true,subtree:true});if(mp)new MutationObserver(syncCompetence).observe(mp,{childList:true,characterData:true,subtree:true});syncSave();renderHistory();renderMonitor();renderSemester();
+
+fillSelects();
+const rc=$('resultCard'),rp=$('resultPercent'),mp=$('metaPeriod');
+if(rc)new MutationObserver(syncSave).observe(rc,{attributes:true,attributeFilter:['class']});
+if(rp)new MutationObserver(syncSave).observe(rp,{childList:true,characterData:true,subtree:true});
+if(mp)new MutationObserver(syncCompetence).observe(mp,{childList:true,characterData:true,subtree:true});
+syncSave();renderHistory();renderMonitor();renderSemester();
 })();
