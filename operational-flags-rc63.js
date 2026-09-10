@@ -4,7 +4,7 @@
 if(window.__ADERENCIA_OPERATIONAL_FLAGS_RC63__)return;
 window.__ADERENCIA_OPERATIONAL_FLAGS_RC63__=true;
 
-const VERSION='RC64.2';
+const VERSION='RC63.2';
 const KEY='aderenciaOperationalFlagsV1';
 const DIVERGENCE_KEY='aderenciaDivergenciasV1';
 const INACTIVE=new Set(['ML04']);
