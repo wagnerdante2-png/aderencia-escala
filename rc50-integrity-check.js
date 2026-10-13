@@ -35,7 +35,7 @@ function run(){
  add('pdf-xlsx-compat',window.ADERENCIA_PDF_XLSX_COMPAT_VERSION==='RC21',window.ADERENCIA_PDF_XLSX_COMPAT_VERSION||'ausente');
  add('recurrence',!!window.ADERENCIA_RECURRENCE);
  add('store-registry',!!window.ADERENCIA_STORE_REGISTRY);
- add('ml61-region',window.ADERENCIA_STORE_REGISTRY?.regionOf?.('ML61')==='GUARDIÕES DA CHAMA',window.ADERENCIA_STORE_REGISTRY?.regionOf?.('ML61')||'ausente');
+ add('ml61-region',window.ADERENCIA_STORE_REGISTRY?.regionOf?.('ML61')==='ALTA PERFORMACE',window.ADERENCIA_STORE_REGISTRY?.regionOf?.('ML61')||'ausente');
  try{const sample=[{store:'ML01',month:6,year:2026,occurrences:[{employee:'TESTE',registration:'1',type:'DESVIO_ENTRADA_GT_90'}]},{store:'ML01',month:7,year:2026,occurrences:[{employee:'TESTE',registration:'1',type:'DESVIO_ENTRADA_GT_90'}]}],a=window.ADERENCIA_RECURRENCE?.aggregate?.(sample,'all'),s=a?.stores?.[0];add('recurrence-rule',!!s&&s.repeat.size===1&&s.people.size===1)}catch(e){add('recurrence-rule',false,e.message)}
  try{const p=window.ADERENCIA_PERIOD?.get?.(),valid=p&&Number.isInteger(+p.month)&&+p.month>=1&&+p.month<=12&&Number.isInteger(+p.year);add('period-state',valid,p?`${p.month}/${p.year}`:'ausente')}catch(e){add('period-state',false,e.message)}
  if(window.ADERENCIA_DIVERGENCE_AUDIT)add('divergence-audit',window.ADERENCIA_DIVERGENCE_AUDIT.ok!==false,window.ADERENCIA_DIVERGENCE_AUDIT.ok===false?'inconsistências detectadas':'ok');
