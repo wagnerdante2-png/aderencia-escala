@@ -20,6 +20,7 @@
 
   <nav class="view-tabs" aria-label="Navegação principal">
     <button id="analysisTab" class="view-tab active" type="button">Análise</button>
+    <button id="manualTab" class="view-tab" type="button">Análise Manual</button>
     <button id="historyTab" class="view-tab" type="button">Histórico</button>
     <button id="monitorTab" class="view-tab" type="button">Monitoramento</button>
     <button id="semesterTab" class="view-tab" type="button">Semestral</button>
@@ -74,6 +75,7 @@
     <details class="card rules"><summary>Regra usada no cálculo</summary><p>É comparada a primeira entrada real do dia com a entrada prevista na escala. Diferenças de até 90 minutos são toleradas. Diferenças acima de 90 minutos valem 1 ponto de penalidade. Em dias previstos como F, FER, AF, AB, AL, FF, FC, NC ou AE, a existência de ao menos uma batida de ponto gera uma única não conformidade para aquele colaborador/data.</p><code>Aderência = 1 - (desvios + 10 × não conformidades) / total de marcações consideradas</code></details>
   </section>
 
+  <section id="manualView" class="hidden manual-view"><section class="card" style="padding:20px;margin:16px 0"><p class="panel-kicker">TRATATIVAS EXCEPCIONAIS</p><h2>Análise Manual</h2><p>Competência, registros e decisões individuais por loja. A ausência de cálculo é exibida como 0%, mas não gera registro automaticamente.</p><div class="history-filters"><label>Mês<select id="manualMonth"></select></label><label>Ano<select id="manualYear"></select></label></div><div id="manualRows" style="overflow:auto"></div></section></section>
   <section id="historyView" class="history-view hidden">
     <section class="history-toolbar card"><div><p class="panel-kicker">DASHBOARD HISTÓRICO</p><h2>Evolução de aderência</h2><p>O histórico fica no navegador e, quando vinculada, também na base portátil da aplicação.</p></div><div class="history-filters"><label>Mês<select id="historyMonth"></select></label><label>Ano<select id="historyYear"></select></label><label>Loja<select id="historyStore"></select></label><button id="historyPdfBtn" class="secondary" type="button">Relatório PDF</button><button id="bonusBtn" class="secondary bonus-button" type="button">Ajuste eletivo +10%</button><button id="exportHistoryBtn" class="secondary" type="button">Backup</button><label class="import-history secondary-button" for="importHistoryFile">Restaurar</label><input id="importHistoryFile" type="file" accept="application/json,.json" /><button id="clearHistoryBtn" class="danger-outline" type="button">Limpar histórico</button></div></section>
     <section class="history-kpis"><article class="history-kpi card"><span>Lojas com resultado</span><strong id="histStores">0</strong></article><article class="history-kpi card"><span>Média da rede</span><strong id="histAverage">—</strong></article><article class="history-kpi card"><span>≥ 95%</span><strong id="histGood">0</strong></article><article class="history-kpi card"><span>&lt; 80%</span><strong id="histCritical">0</strong></article></section>
@@ -101,6 +103,7 @@
 <script src="bootstrap.js"></script>
 <script src="engine-v3.js"></script>
 <script src="history.js"></script>
+<script src="manual-analysis.js"></script>
 <script src="history-report.js"></script>
 <script src="export-report.js"></script>
 </body>
