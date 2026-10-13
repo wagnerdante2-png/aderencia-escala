@@ -32,8 +32,8 @@ test('regional snapshot averages stores by configured region for selected month'
     ]);
     return window.ADERENCIA_REPORTING_RC51.regionalSnapshot(2026,6);
   });
-  const chama=snap.regions.find(r=>r.name==='GUARDIÕES DA CHAMA');
-  const luz=snap.regions.find(r=>r.name==='GUARDIÕES DA LUZ');
+  const chama=snap.regions.find(r=>r.name==='ALTA PERFORMACE');
+  const luz=snap.regions.find(r=>r.name==='LEGADO');
   expect(chama.count).toBe(2);
   expect(chama.value).toBe(85);
   expect(luz.count).toBe(1);
