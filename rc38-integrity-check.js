@@ -18,7 +18,7 @@ function run(){
   add('canonical divergence capture',!!window.__ADERENCIA_DIVERGENCE_CAPTURE_RC20__);
   add('store registry',!!window.ADERENCIA_STORE_REGISTRY?.load);
   const ml61=window.ADERENCIA_STORE_REGISTRY?.regionOf?.('ML61');
-  add('ML61 regional',ml61==='GUARDIÕES DA CHAMA',ml61||'');
+  add('ML61 regional',ml61==='ALTA PERFORMACE',ml61||'');
   const failures=results.filter(x=>!x.ok);
   window.ADERENCIA_RC39_HEALTH={ok:!failures.length,checkedAt:new Date().toISOString(),checks:results,failures};
   window.ADERENCIA_RC38_HEALTH=window.ADERENCIA_RC39_HEALTH;
