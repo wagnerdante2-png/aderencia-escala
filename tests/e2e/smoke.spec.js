@@ -99,14 +99,14 @@ test('11-to-10 competence is anchored to the start of the point period', async (
 
 test('store registry includes ML61 in Guardiões da Chama and accepts a new store', async ({ page }) => {
   await page.waitForFunction(() => window.ADERENCIA_STORE_REGISTRY);
-  expect(await page.evaluate(() => window.ADERENCIA_STORE_REGISTRY.regionOf('ML61'))).toBe('GUARDIÕES DA CHAMA');
+  expect(await page.evaluate(() => window.ADERENCIA_STORE_REGISTRY.regionOf('ML61'))).toBe('ALTA PERFORMACE');
   await page.getByRole('button', { name: 'Lojas' }).click();
   await page.locator('#storeCode').fill('62');
   await page.locator('#storeName').fill('LOJA TESTE E2E');
-  await page.locator('#storeRegion').selectOption({ label: 'VENTO DOURADO' });
+  await page.locator('#storeRegion').selectOption({ label: 'AÇÃO E RESULTADO' });
   await page.locator('#storeSaveBtn').click();
   const saved = await page.evaluate(() => window.ADERENCIA_STORE_REGISTRY.load().ML62);
-  expect(saved).toMatchObject({ code: 'ML62', name: 'LOJA TESTE E2E', region: 'VENTO DOURADO' });
+  expect(saved).toMatchObject({ code: 'ML62', name: 'LOJA TESTE E2E', region: 'AÇÃO E RESULTADO' });
 });
 
 test('history persistence survives reload', async ({ page }) => {
