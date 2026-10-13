@@ -96,6 +96,6 @@ test('corrupted persisted history and store registry do not break startup', asyn
   }));
   expect(errors).toEqual([]);
   expect(state.history).toEqual([]);
-  expect(state.ml61).toBe('GUARDIÕES DA CHAMA');
+  expect(state.ml61).toBe('ALTA PERFORMACE');
   expect(state.health).toBeTruthy();
 });
