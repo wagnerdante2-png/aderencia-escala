@@ -21,7 +21,7 @@ function run(){
  add('performance layer',!!window.__ADERENCIA_PERFORMANCE_RC42__);
  add('store registry',!!window.ADERENCIA_STORE_REGISTRY?.load);
  const ml61=window.ADERENCIA_STORE_REGISTRY?.regionOf?.('ML61');
- add('ML61 regional',ml61==='GUARDIÕES DA CHAMA',ml61||'');
+ add('ML61 regional',ml61==='ALTA PERFORMACE',ml61||'');
  const p=window.ADERENCIA_PERIOD?.get?.();
  if(p){
   const pairs=[['networkLedMonth',p.month],['historyMonth',p.month],['monitorMonth',p.month],['divMonth',p.month],['networkLedYear',p.year],['historyYear',p.year],['monitorYear',p.year],['divYear',p.year],['semesterYear',p.year]];
